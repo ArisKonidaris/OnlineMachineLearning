@@ -12,10 +12,10 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
 /** An abstract base class of an Online Machine Learning worker.
-  *
-  * @tparam ProxyIfc The remote interface of the Parameter Server.
-  * @tparam QueryIfc The remote interface of the querier.
-  */
+ *
+ * @tparam ProxyIfc The remote interface of the Parameter Server.
+ * @tparam QueryIfc The remote interface of the querier.
+ */
 abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, QueryIfc] {
 
   /** The distributed training protocol. */
@@ -25,13 +25,13 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   protected var processed_data: Long = 0
 
   /** The size of the mini batch, or else, the number of distinct data points
-    * that are fitted to the Machine Learning pipeline in single fit operation.
-    */
+   * that are fitted to the Machine Learning pipeline in single fit operation.
+   */
   protected var mini_batch_size: Int = 64
 
   /** The number of mini-batches fitted by the worker before checking
-    * if it should push its parameters to the parameter server.
-    */
+   * if it should push its parameters to the parameter server.
+   */
   protected var mini_batches: Int = 4
 
   /** The local Machine Learning pipeline to train in on streaming data. */
@@ -98,11 +98,11 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   // ======================================== ML worker basic operations ===============================================
 
   /** This method configures an Online Machine Learning worker by using a creation Request.
-    *
-    * @param request The creation request provided.
-    * @return An [[MLWorker]] instance with Parameter Server
-    *         proxies of type [[ProxyIfc]] and querier proxy type of [[QueryIfc]].
-    */
+   *
+   * @param request The creation request provided.
+   * @return An [[MLWorker]] instance with Parameter Server
+   *         proxies of type [[ProxyIfc]] and querier proxy type of [[QueryIfc]].
+   */
   def configureWorker(request: Request): MLWorker[ProxyIfc, QueryIfc] = {
 
     // Setting the ML node parameters
@@ -165,10 +165,10 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   }
 
   /** A method called when merging two Machine Learning workers.
-    *
-    * @param workers The Machine Learning workers to merge this one with.
-    * @return An array of [[MLWorker]] instances.
-    */
+   *
+   * @param workers The Machine Learning workers to merge this one with.
+   * @return An array of [[MLWorker]] instances.
+   */
   @MergeOp
   def merge(workers: Array[MLWorker[ProxyIfc, QueryIfc]]): MLWorker[ProxyIfc, QueryIfc] = {
     setProcessedData(0)
@@ -180,10 +180,10 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   }
 
   /** Calculates the drift of the local model compared to
-    * the last global model received by the ML worker.
-    *
-    * @return The delta parameters.
-    */
+   * the last global model received by the ML worker.
+   *
+   * @return The delta parameters.
+   */
   def getDeltaVector: LearningParameters = {
     try {
       getLearnerParams.get - getGlobalModel
@@ -193,10 +193,10 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   }
 
   /** A method for calculating the performance of the local model.
-    *
-    * @param test_set The test set to calculate the performance on.
-    * @return A String representation of the performance of the model.
-    */
+   *
+   * @param test_set The test set to calculate the performance on.
+   * @return A String representation of the performance of the model.
+   */
   def getPerformance(test_set: ListBuffer[Point]): String = ml_pipeline.score(test_set).toString
 
   /** Converts the model into a Serializable POJO case class to be send over the Network. */

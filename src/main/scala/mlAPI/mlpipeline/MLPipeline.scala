@@ -193,7 +193,7 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
   }
 
   def predict(data: Point): Option[Double] = {
-    require(learner != null, "The ML Pipeline must have a learner make a prediction.")
+    require(learner != null, "The ML Pipeline must have a learner to make a prediction.")
     pipePoint(data, preprocess, learner.predict)
   }
 

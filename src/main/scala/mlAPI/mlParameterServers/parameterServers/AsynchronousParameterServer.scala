@@ -6,12 +6,12 @@ import BipartiteTopologyAPI.annotations.{InitOp, MergeOp, ProcessOp, QueryOp}
 import BipartiteTopologyAPI.futures.{PromiseResponse, Response}
 import mlAPI.mlParameterServers.PullPush
 import mlAPI.math.DenseVector
-import mlAPI.mlworkers.interfaces.{MLWorkerRemote, Querier}
+import mlAPI.mlworkers.interfaces.{RemoteLearner, Querier}
 import mlAPI.parameters.ParameterDescriptor
 
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
-case class AsynchronousParameterServer() extends MLParameterServer[MLWorkerRemote, Querier] with PullPush {
+case class AsynchronousParameterServer() extends MLParameterServer[RemoteLearner, Querier] with PullPush {
 
   var parameters: BreezeDenseVector[Double] = _
 
@@ -22,29 +22,29 @@ case class AsynchronousParameterServer() extends MLParameterServer[MLWorkerRemot
   def init(): Unit = promises = 0L
 
   /**
-    * The consumption method of user messages. Right know this is an empty method.
-    *
-    * @param data A data tuple for the Parameter Server.
-    */
+   * The consumption method of user messages. Right know this is an empty method.
+   *
+   * @param data A data tuple for the Parameter Server.
+   */
   @ProcessOp
   def receiveTuple[T <: Serializable](data: T): Unit = {
 
   }
 
   /** A method called when merging multiple Parameter Servers. Right know this is an empty method.
-    *
-    * @param parameterServers The parameter servers to merge this one with.
-    * @return An array of [[AsynchronousParameterServer]] instances.
-    */
+   *
+   * @param parameterServers The parameter servers to merge this one with.
+   * @return An array of [[AsynchronousParameterServer]] instances.
+   */
   @MergeOp
   def merge(parameterServers: Array[AsynchronousParameterServer]): AsynchronousParameterServer = {
     this
   }
 
   /** This method responds to a query for the Parameter Server. Right know this is an empty method.
-    *
-    * @param predicates Any predicate that is necessary for the calculation of the query.
-    */
+   *
+   * @param predicates Any predicate that is necessary for the calculation of the query.
+   */
   @QueryOp
   def query(queryId: Long, queryTarget: Int, predicates: Array[java.io.Serializable]): Unit = {
   }

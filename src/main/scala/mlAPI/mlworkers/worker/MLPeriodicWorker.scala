@@ -4,13 +4,13 @@ import ControlAPI.QueryResponse
 import BipartiteTopologyAPI.annotations.{InitOp, ProcessOp, QueryOp}
 import mlAPI.math.{DenseVector, Point, SparseVector}
 import mlAPI.mlParameterServers.PullPush
-import mlAPI.mlworkers.interfaces.{MLWorkerRemote, Querier}
+import mlAPI.mlworkers.interfaces.{RemoteLearner, Querier}
 import mlAPI.parameters.ParameterDescriptor
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 
-case class MLPeriodicWorker() extends MLWorker[PullPush, Querier] with MLWorkerRemote {
+case class MLPeriodicWorker() extends MLWorker[PullPush, Querier] with RemoteLearner {
 
   /** Initialization method of the Machine Learning worker node. */
   @InitOp

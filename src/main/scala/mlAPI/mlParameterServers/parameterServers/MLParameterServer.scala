@@ -5,26 +5,26 @@ import ControlAPI.Request
 import mlAPI.parameters.ParameterDescriptor
 
 /**
-  * An abstract base class of a Machine Learning Parameter Server.
-  *
-  * @tparam WorkerIfc The remote interface of the Machine Learning worker.
-  * @tparam QueryIfc The remote interface of the querier.
-  */
+ * An abstract base class of a Machine Learning Parameter Server.
+ *
+ * @tparam WorkerIfc The remote interface of the Machine Learning worker.
+ * @tparam QueryIfc  The remote interface of the querier.
+ */
 abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[WorkerIfc, QueryIfc] {
 
   /**
-    * The cumulative loss of the distributed Machine Learning training.
-    */
+   * The cumulative loss of the distributed Machine Learning training.
+   */
   protected var cumulativeLoss: Double = 0D
 
   /**
-    * The number of data fitted to the distributed Machine Learning algorithm.
-    */
+   * The number of data fitted to the distributed Machine Learning algorithm.
+   */
   protected var fitted: Long = 0L
 
   /**
-    * The range of parameters that the current parameter server is responsible for.
-    */
+   * The range of parameters that the current parameter server is responsible for.
+   */
   protected var parametersDescription: ParameterDescriptor = _
 
   // ================================================= Getters =========================================================
@@ -47,8 +47,8 @@ abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[Worke
   // ============================== Machine Learning Parameter Server Basic Operations =================================
 
   /** This method configures the Parameter Server Node by using a creation Request.
-    * Right now this method does not provide any functionality. It exists for configuring
-    * more complex parameter server that may be developed later on. */
+   * Right now this method does not provide any functionality. It exists for configuring
+   * more complex parameter server that may be developed later on. */
   def configureParameterServer(request: Request): MLParameterServer[WorkerIfc, QueryIfc] = {
     this
   }
