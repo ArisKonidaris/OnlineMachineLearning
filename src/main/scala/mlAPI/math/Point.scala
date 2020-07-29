@@ -37,11 +37,17 @@ trait Point extends Serializable {
 
   def categoricalToList: List[String] = categoricalVector.toList
 
-  def marshal: (Array[Int], Array[Double], Array[String]) = (
-    Array[Int](numericVector.size, discreteVector.size),
-    numericVector.toList.toArray ++ discreteVector.toList.toArray,
-    categoricalVector
-  )
+  def marshal(): (Array[Int], Array[Double], Array[String]) = {
+    (
+      Array[Int](numericVector.size, discreteVector.size),
+      {
+        val ar1: Array[Double] = numericVector.toList.toArray
+        val ar2: Array[Double] = discreteVector.toList.toArray
+        ar1 ++ ar2
+      },
+      categoricalVector
+    )
+  }
 
 }
 
