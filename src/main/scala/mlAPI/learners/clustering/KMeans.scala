@@ -62,8 +62,8 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
       val update = {
         if (trainingMethod.equals("sequential")) {
           counts(prediction) += 1
-          (1.0 / counts(prediction)) * (data.getVector.asDenseBreeze - centroids.vectors(prediction).vector)
-        } else step * (data.getVector.asDenseBreeze - centroids.vectors(prediction).vector)
+          (1.0 / counts(prediction)) * (data.getNumericVector.asDenseBreeze - centroids.vectors(prediction).vector)
+        } else step * (data.getNumericVector.asDenseBreeze - centroids.vectors(prediction).vector)
       }
       centroids.vectors(prediction).vector += update
     } else initialize_model(data)
@@ -75,7 +75,7 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
   override def distribution(data: Point): Array[Double] = {
     if (this.counts != null && this.centroids != null) {
       (for (centroid: EuclideanVector <- centroids.vectors)
-        yield breeze.linalg.functions.euclideanDistance(data.vector.asBreeze, centroid.vector)).toArray
+        yield breeze.linalg.functions.euclideanDistance(data.getNumericVector.asBreeze, centroid.vector)).toArray
     } else Array[Double]()
   }
 
@@ -94,10 +94,12 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
         if (!randomIndexes.contains(r)) randomIndexes.append(r)
       }
       for (randomIndex: Int <- randomIndexes)
-        initialCentroids.append(EuclideanVector(initFeatures.remove(randomIndex).vector.asDenseBreeze))
+        initialCentroids.append(EuclideanVector(initFeatures.remove(randomIndex).getNumericVector.asDenseBreeze))
     } else {
       // Choose the first centroid uniformly at random.
-      initialCentroids.append(EuclideanVector(initFeatures.remove(Random.nextInt(initFeatures.size)).vector.asDenseBreeze))
+      initialCentroids.append(
+        EuclideanVector(initFeatures.remove(Random.nextInt(initFeatures.size)).getNumericVector.asDenseBreeze)
+      )
 
       // Choose the rest of the centroids.
       for (_ <- 1 until nClusters) {
@@ -119,7 +121,7 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
         def addNewCentroid(index: Int): EuclideanVector = {
           require(index >= 0 && index <= dxs.length - 1)
           if (dxs(index) >= r)
-            EuclideanVector(initFeatures.remove(index).vector.asDenseBreeze)
+            EuclideanVector(initFeatures.remove(index).getNumericVector.asDenseBreeze)
           else
             addNewCentroid(index + 1)
         }
@@ -212,7 +214,7 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
           try {
             val pl: ListBuffer[Point] = ListBuffer[Point]()
             for (v: java.util.List[Double] <- value.asInstanceOf[java.util.List[java.util.List[Double]]].asScala)
-              pl.append(UnlabeledPoint(DenseVector(v.asScala.toArray)))
+              pl.append(UnlabeledPoint(DenseVector(v.asScala.toArray), DenseVector(), Array[String]()))
             initFeatures = pl
           } catch {
             case e: Exception =>
@@ -302,7 +304,8 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
           if(initFeatures == null)
             null
           else
-            (for (initFeat <- initFeatures) yield initFeat.getVector.asDenseBreeze.data).toArray.asInstanceOf[AnyRef]
+            (for (initFeat <- initFeatures) yield initFeat.getNumericVector.asDenseBreeze.data)
+              .toArray.asInstanceOf[AnyRef]
         )
       ).asJava
     )

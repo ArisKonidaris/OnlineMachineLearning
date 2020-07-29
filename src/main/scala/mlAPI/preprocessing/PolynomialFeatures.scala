@@ -74,9 +74,15 @@ object PolynomialFeatures {
 
   def polynomial(point: Point, degree: Int): Point = {
     point match {
-      case LabeledPoint(label, vector) =>
-        LabeledPoint(label, DenseVector(combinations(vector.toList, degree).toArray))
-      case UnlabeledPoint(vector) => UnlabeledPoint(DenseVector(combinations(vector.toList, degree).toArray))
+      case LabeledPoint(label, numericalFeatures, _, _) =>
+        LabeledPoint(label,
+          DenseVector(combinations(numericalFeatures.toList, degree).toArray),
+          DenseVector(),
+          Array[String]())
+      case UnlabeledPoint(numericalFeatures, _, _) =>
+        UnlabeledPoint(DenseVector(combinations(numericalFeatures.toList, degree).toArray),
+          DenseVector(),
+          Array[String]())
     }
   }
 

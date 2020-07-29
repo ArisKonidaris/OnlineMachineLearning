@@ -20,12 +20,12 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
   protected var count: Long = 0L
 
   override def initialize_model(data: Point): Unit = {
-    weights = linear_params(BreezeDenseVector.zeros[Double](data.getVector.size), 0.0)
+    weights = linear_params(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
   }
 
   def predictWithMargin(data: Point): Option[Double] = {
     try {
-      Some((data.vector.asBreeze dot weights.weights) + weights.intercept)
+      Some((data.getNumericVector.asBreeze dot weights.weights) + weights.intercept)
     } catch {
       case _: Throwable => None
     }
@@ -53,7 +53,8 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
           val sign: Double = if (label * prediction < 1.0) 1.0 else 0.0
           val loss: Double = Math.max(0.0, 1.0 - label * prediction)
 
-          val direction = linear_params(weights.weights - C * label * data.vector.asBreeze * sign, - label * sign)
+          val direction =
+            linear_params(weights.weights - C * label * data.getNumericVector.asBreeze * sign, - label * sign)
 
           count += 1
           weights += (direction / count)
@@ -74,7 +75,7 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
     if (weights == null) {
       initialize_model(data)
     } else {
-      if(weights.weights.size != data.getVector.size)
+      if(weights.weights.size != data.getNumericVector.size)
         throw new RuntimeException("Incompatible model and data point size.")
       else
         throw new RuntimeException("Something went wrong while fitting the data point " +

@@ -117,8 +117,8 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
-            <!-- Scala Compiler -->
 
+            <!-- Scala Compiler -->
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>

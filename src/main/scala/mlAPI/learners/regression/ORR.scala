@@ -20,7 +20,7 @@ case class ORR() extends OnlineLearner with Regressor with Serializable {
 
   protected var lambda: Double = 0.0
 
-  override def initialize_model(data: Point): Unit = weights = model_init(data.getVector.size + 1)
+  override def initialize_model(data: Point): Unit = weights = model_init(data.getNumericVector.size + 1)
 
   override def predict(data: Point): Option[Double] = {
     try {
@@ -62,7 +62,7 @@ case class ORR() extends OnlineLearner with Regressor with Serializable {
 
   private def add_bias(data: Point): BreezeDenseVector[Double] = {
     BreezeDenseVector.vertcat(
-      data.vector.asBreeze.asInstanceOf[BreezeDenseVector[Double]],
+      data.getNumericVector.asBreeze.asInstanceOf[BreezeDenseVector[Double]],
       BreezeDenseVector.ones(1))
   }
 

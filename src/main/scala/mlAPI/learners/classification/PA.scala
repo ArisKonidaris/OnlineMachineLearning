@@ -34,7 +34,8 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Serializa
         val loss: Double = Math.max(0.0, 1.0 - label * prediction)
         if (loss > 0.0) {
           val lagrangeMultiplier: Double = LagrangeMultiplier(loss, data)
-          weights += VectorBias(data.vector.asDenseBreeze * (lagrangeMultiplier * label), lagrangeMultiplier * label)
+          weights +=
+            VectorBias(data.getNumericVector.asDenseBreeze * (lagrangeMultiplier * label), lagrangeMultiplier * label)
         }
         loss
       case None =>

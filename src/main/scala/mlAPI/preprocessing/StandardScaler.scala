@@ -3,7 +3,7 @@ package mlAPI.preprocessing
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import breeze.numerics.sqrt
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point, UnlabeledPoint, Vector}
+import mlAPI.math.{LabeledPoint, Point, UnlabeledPoint, Vector, DenseVector}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -16,16 +16,16 @@ case class StandardScaler() extends learningPreprocessor {
   private var count: Long = _
 
   override def init(point: Point): Unit = {
-    mean = BreezeDenseVector.zeros[Double](point.vector.size)
-    d_squared = BreezeDenseVector.zeros[Double](point.vector.size)
+    mean = BreezeDenseVector.zeros[Double](point.getNumericVector.size)
+    d_squared = BreezeDenseVector.zeros[Double](point.getNumericVector.size)
     count = 0L
   }
 
   override def fit(point: Point): Unit = {
     try {
       count += 1
-      val newMean = mean + (1 / (1.0 * count)) * (point.vector.asBreeze - mean)
-      d_squared += (point.vector.asBreeze - newMean) * (point.vector.asBreeze - mean)
+      val newMean = mean + (1 / (1.0 * count)) * (point.getNumericVector.asBreeze - mean)
+      d_squared += (point.getNumericVector.asBreeze - newMean) * (point.getNumericVector.asBreeze - mean)
       mean = newMean
     } catch {
       case _: Throwable =>
@@ -50,16 +50,15 @@ case class StandardScaler() extends learningPreprocessor {
 
   private def matchTransform(point: Point): Point = {
     point match {
-      case UnlabeledPoint(_) =>
-        if (count > 1) UnlabeledPoint(scale(point)) else point
-
-      case LabeledPoint(label, _) =>
-        if (count > 1) LabeledPoint(label, scale(point)) else point
+      case UnlabeledPoint(_, _, _) =>
+        if (count > 1) UnlabeledPoint(scale(point), DenseVector(), Array[String]()) else point
+      case LabeledPoint(label, _, _, _) =>
+        if (count > 1) LabeledPoint(label, scale(point), DenseVector(), Array[String]()) else point
     }
   }
 
   private def scale(point: Point): Vector = {
-    ((point.vector.asBreeze - mean) / sqrt((1.0 / count) * d_squared)).fromBreeze
+    ((point.getNumericVector.asBreeze - mean) / sqrt((1.0 / count) * d_squared)).fromBreeze
   }
 
   def getMean: BreezeDenseVector[Double] = mean

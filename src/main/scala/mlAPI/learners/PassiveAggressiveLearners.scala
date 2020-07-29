@@ -17,12 +17,12 @@ abstract class PassiveAggressiveLearners extends OnlineLearner {
   protected var weights: VectorBias = _
 
   override def initialize_model(data: Point): Unit = {
-    weights = VectorBias(BreezeDenseVector.zeros[Double](data.getVector.size), 0.0)
+    weights = VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
   }
 
   protected def predictWithMargin(data: Point): Option[Double] = {
     try {
-      Some((data.vector.asBreeze dot weights.weights) + weights.intercept)
+      Some((data.getNumericVector.asBreeze dot weights.weights) + weights.intercept)
     } catch {
       case _: Throwable => None
     }
@@ -30,9 +30,9 @@ abstract class PassiveAggressiveLearners extends OnlineLearner {
 
   protected def LagrangeMultiplier(loss: Double, data: Point): Double = {
     updateType match {
-      case "STANDARD" => loss / (1.0 + ((data.vector dot data.vector) + 1.0))
-      case "PA-I" => Math.min(C, loss / ((data.vector dot data.vector) + 1.0))
-      case "PA-II" => loss / (((data.vector dot data.vector) + 1.0) + 1.0 / (2.0 * C))
+      case "STANDARD" => loss / (1.0 + ((data.getNumericVector dot data.getNumericVector) + 1.0))
+      case "PA-I" => Math.min(C, loss / ((data.getNumericVector dot data.getNumericVector) + 1.0))
+      case "PA-II" => loss / (((data.getNumericVector dot data.getNumericVector) + 1.0) + 1.0 / (2.0 * C))
     }
   }
 
@@ -40,7 +40,7 @@ abstract class PassiveAggressiveLearners extends OnlineLearner {
     if (weights == null) {
       initialize_model(data)
     } else {
-      if (weights.weights.size != data.getVector.size)
+      if (weights.weights.size != data.getNumericVector.size)
         throw new RuntimeException("Incompatible model and data point size.")
       else
         throw new RuntimeException("Something went wrong while fitting the data point " +

@@ -26,7 +26,7 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
 
   override def initialize_model(data: Point): Unit = {
     val vbl: ListBuffer[VectorBias] = ListBuffer[VectorBias]()
-    for (_ <- 0 until nClasses) vbl.append(VectorBias(BreezeDenseVector.zeros[Double](data.getVector.size), 0.0))
+    for (_ <- 0 until nClasses) vbl.append(VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0))
     weights = VectorBiasList(vbl)
   }
 
@@ -35,7 +35,7 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
       var prediction: Int = -1
       var highestScore: Double = -Double.MaxValue
       for ((model: VectorBias, i: Int) <- weights.vectorBiases.zipWithIndex) {
-        val currentClassScore = (data.vector.asBreeze dot model.weights) + model.intercept
+        val currentClassScore = (data.getNumericVector.asBreeze dot model.weights) + model.intercept
         if (currentClassScore > highestScore) {
           prediction = i
           highestScore = currentClassScore
@@ -61,9 +61,9 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
           val exp_weights = weights.vectorBiases(label.toInt)
           val pred_weights = weights.vectorBiases(pred)
           1.0 - (
-            ((data.vector.asBreeze dot exp_weights.weights) + exp_weights.intercept)
+            ((data.getNumericVector.asBreeze dot exp_weights.weights) + exp_weights.intercept)
               -
-              ((data.vector.asBreeze dot pred_weights.weights) + pred_weights.intercept)
+              ((data.getNumericVector.asBreeze dot pred_weights.weights) + pred_weights.intercept)
             )
         }
         for ((weight: VectorBias, i: Int) <- weights.vectorBiases.zipWithIndex)
@@ -72,9 +72,9 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
           else {
             val t: Double = tau(loss, data)
             if (i == label)
-              weight += VectorBias((data.vector.asBreeze * t).asInstanceOf[BreezeDenseVector[Double]], t)
+              weight += VectorBias((data.getNumericVector.asBreeze * t).asInstanceOf[BreezeDenseVector[Double]], t)
             else if (i == pred)
-              weight -= VectorBias((data.vector.asBreeze * t).asInstanceOf[BreezeDenseVector[Double]], t)
+              weight -= VectorBias((data.getNumericVector.asBreeze * t).asInstanceOf[BreezeDenseVector[Double]], t)
           }
         loss
       case None =>
@@ -88,9 +88,9 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
 
   private def tau(loss: Double, data: Point): Double = {
     updateType match {
-      case "STANDARD" => loss / (1.0 + 2.0 * ((data.vector dot data.vector) + 1.0))
-      case "PA-I" => Math.min(C / 2.0, loss / (2.0 * ((data.vector dot data.vector) + 1.0)))
-      case "PA-II" => 0.5 * (loss /(((data.vector dot data.vector) + 1.0) + 1.0 / (2.0 * C)))
+      case "STANDARD" => loss / (1.0 + 2.0 * ((data.getNumericVector dot data.getNumericVector) + 1.0))
+      case "PA-I" => Math.min(C / 2.0, loss / (2.0 * ((data.getNumericVector dot data.getNumericVector) + 1.0)))
+      case "PA-II" => 0.5 * (loss /(((data.getNumericVector dot data.getNumericVector) + 1.0) + 1.0 / (2.0 * C)))
     }
   }
 
@@ -100,7 +100,7 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Serializabl
     if (weights == null) {
       initialize_model(data)
     } else {
-      if(weights.vectorBiases.head.weights.length != data.getVector.size)
+      if(weights.vectorBiases.head.weights.length != data.getNumericVector.size)
         throw new RuntimeException("Incompatible model and data point size.")
       else
         throw new RuntimeException("Something went wrong while fitting the data point " +

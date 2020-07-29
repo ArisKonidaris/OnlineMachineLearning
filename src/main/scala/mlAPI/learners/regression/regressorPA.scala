@@ -33,7 +33,7 @@ case class regressorPA() extends PassiveAggressiveLearners with Regressor with S
           val Lagrange_Multiplier: Double = LagrangeMultiplier(loss, data)
           val sign: Double = if ((label - prediction) >= 0) 1.0 else -1.0
           weights += lin_params(
-            (data.vector.asBreeze * (Lagrange_Multiplier * sign)).asInstanceOf[BreezeDenseVector[Double]],
+            (data.getNumericVector.asBreeze * (Lagrange_Multiplier * sign)).asInstanceOf[BreezeDenseVector[Double]],
             Lagrange_Multiplier * sign)
         }
         loss
