@@ -3,10 +3,9 @@ package mlAPI.parameters
 import mlAPI.math.{DenseVector, Vector}
 
 /** A Serializable POJO case class for sending the parameters over the Network.
-  * This class contains all the necessary information to reconstruct the parameters
-  * on the receiver side.
-  *
-  */
+ * This class contains all the necessary information to reconstruct the parameters
+ * on the receiver side.
+ */
 case class ParameterDescriptor(var paramSizes: Array[Int],
                                var params: Vector,
                                var bucket: Bucket,

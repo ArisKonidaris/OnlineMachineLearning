@@ -3,7 +3,7 @@ package mlAPI.learners.classification
 import mlAPI.math.Breeze._
 import mlAPI.learners.{Learner, OnlineLearner}
 import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias => linear_params}
+import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias}
 import mlAPI.scores.Scores
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
@@ -15,12 +15,12 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
 
   protected var C: Double = 0.01
 
-  protected var weights: linear_params = _
+  protected var weights: VectorBias = _
 
   protected var count: Long = 0L
 
   override def initialize_model(data: Point): Unit = {
-    weights = linear_params(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
+    weights = VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
   }
 
   def predictWithMargin(data: Point): Option[Double] = {
@@ -53,8 +53,7 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
           val sign: Double = if (label * prediction < 1.0) 1.0 else 0.0
           val loss: Double = Math.max(0.0, 1.0 - label * prediction)
 
-          val direction =
-            linear_params(weights.weights - C * label * data.getNumericVector.asBreeze * sign, - label * sign)
+          val direction = VectorBias(weights.weights - C * label * data.getNumericVector.asBreeze * sign, - label * sign)
 
           count += 1
           weights += (direction / count)
@@ -86,8 +85,8 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
   override def getParameters: Option[LearningParameters] = Some(weights)
 
   override def setParameters(params: LearningParameters): Learner = {
-    assert(params.isInstanceOf[linear_params])
-    weights = params.asInstanceOf[linear_params]
+    assert(params.isInstanceOf[VectorBias])
+    weights = params.asInstanceOf[VectorBias]
     this
   }
 
@@ -151,10 +150,10 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
 
   override def toString: String = s"SVM classifier ${this.hashCode}"
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new linear_params().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
 
   override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
-    new linear_params().generateSerializedParams
+    new VectorBias().generateSerializedParams
 
   override def generatePOJOLearner: ControlAPI.Learner = {
     new ControlAPI.Learner("SVM",

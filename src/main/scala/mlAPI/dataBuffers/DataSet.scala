@@ -1,7 +1,7 @@
 package mlAPI.dataBuffers
 
 import BipartiteTopologyAPI.network.Mergeable
-import mlAPI.dataBuffers.removestrategy.{RandomRemoveStrategy, RemoveOldestStrategy, RemoveStrategy}
+import mlAPI.dataBuffers.removeStrategy.{RandomRemoveStrategy, RemoveOldestStrategy, RemoveStrategy}
 
 import scala.collection.mutable.ListBuffer
 

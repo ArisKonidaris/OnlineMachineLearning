@@ -1,4 +1,4 @@
-package mlAPI.dataBuffers.removestrategy
+package mlAPI.dataBuffers.removeStrategy
 
 import mlAPI.dataBuffers.DataSet
 

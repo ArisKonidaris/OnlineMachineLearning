@@ -94,10 +94,10 @@ class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with Remot
   def receiveTuple(data: DataInstance): Unit = {
 
     val features: (Vector, Vector, Array[String]) = {
-      (if (data.getNumericFeatures == null)
+      (if (data.getNumericalFeatures == null)
         DenseVector()
       else
-        DenseVector(data.getNumericFeatures.asInstanceOf[java.util.List[Double]].asScala.toArray),
+        DenseVector(data.getNumericalFeatures.asInstanceOf[java.util.List[Double]].asScala.toArray),
         if (data.getDiscreteFeatures == null)
           DenseVector()
         else
