@@ -37,8 +37,6 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Serializa
           weights +=
             VectorBias(data.getNumericVector.asDenseBreeze * (lagrangeMultiplier * label), lagrangeMultiplier * label)
         }
-//        println("PA prediction: " + prediction + " PA loss: " + loss)
-
         loss
       case None =>
         checkParameters(data)

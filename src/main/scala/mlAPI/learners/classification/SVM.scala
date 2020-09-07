@@ -53,10 +53,10 @@ case class SVM() extends OnlineLearner with Classifier with Serializable {
           val sign: Double = if (label * prediction < 1.0) 1.0 else 0.0
           val loss: Double = Math.max(0.0, 1.0 - label * prediction)
 
-          val direction = VectorBias(weights.weights - C * label * data.getNumericVector.asBreeze * sign, - label * sign)
+          val direction = VectorBias(weights.weights - C * label * sign * data.getNumericVector.asBreeze, - label * sign)
 
           count += 1
-          weights += (direction / count)
+          weights -= (direction / count)
 
           loss
         case None =>

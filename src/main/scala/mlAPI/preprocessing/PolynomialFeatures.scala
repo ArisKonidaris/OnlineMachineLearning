@@ -39,7 +39,7 @@ case class PolynomialFeatures() extends Preprocessor {
       hyperparameter match {
         case "degree" =>
           try {
-            setDegree(value.asInstanceOf[Int])
+            setDegree(value.asInstanceOf[Double].toInt)
           } catch {
             case e: Exception =>
               println("Error while trying to update the degree of Polynomial Features")
