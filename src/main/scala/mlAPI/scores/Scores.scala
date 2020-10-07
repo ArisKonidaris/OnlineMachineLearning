@@ -40,26 +40,43 @@ object Scores {
   }
 
   def F1Score(testSet: ListBuffer[LabeledPoint], learner: Classifier): Double = {
+
+    def frac(a: Int, b: Int): Double = {
+      val denom: Int = a + b
+      if (denom == 0) 0D else (1.0 * a) / denom
+    }
+
     var truePositive: Int = 0
     var falsePositive: Int = 0
     var trueNegative: Int = 0
-    var FalseNegative: Int = 0
+    var falseNegative: Int = 0
     try {
       if (testSet.nonEmpty) {
         for (point: LabeledPoint <- testSet) {
+          val true_label = if (point.label > 0.0) 1D else -1D
           val prediction: Double = learner.predict(point).get
-          if (point.label > 0.0 && prediction > 0.0)
+          if (true_label > 0.0 && prediction > 0.0)
             truePositive += 1
-          else if (point.label > 0.0 && prediction < 0.0)
-            FalseNegative += 1
-          else if (point.label < 0.0 && prediction > 0.0)
+          else if (true_label > 0.0 && prediction < 0.0)
+            falseNegative += 1
+          else if (true_label < 0.0 && prediction > 0.0)
             falsePositive += 1
-          else if (point.label < 0.0 && prediction < 0.0)
+          else if (true_label < 0.0 && prediction < 0.0)
             trueNegative += 1
         }
-        val precision: Double = (1.0 * truePositive) / (truePositive + falsePositive)
-        val recall: Double = (1.0 * truePositive) / (truePositive + FalseNegative)
-        2.0 * (precision * recall) / (precision + recall)
+        val precision: Double = frac(truePositive, falsePositive)
+        val recall: Double = frac(truePositive, falseNegative)
+        println("################################")
+        println("truePositive: " + truePositive)
+        println("falseNegative: " + falseNegative)
+        println("falsePositive: " + falsePositive)
+        println("trueNegative: " + trueNegative)
+        println("precision: " + precision)
+        println("recall: " + recall)
+        if (precision + recall == 0)
+          0D
+        else
+          2D * (precision * recall) / (precision + recall)
       } else 0.0
     } catch {
       case _: Throwable => 0.0

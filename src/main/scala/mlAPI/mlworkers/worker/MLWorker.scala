@@ -112,7 +112,13 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
     if (config.contains("mini_batch_size")) {
       try {
-        setMiniBatchSize(config("mini_batch_size").asInstanceOf[Double].toInt)
+        setMiniBatchSize(
+          if (config("mini_batch_size").isInstanceOf[Double])
+            config("mini_batch_size").asInstanceOf[Double].toInt
+          else if (config("mini_batch_size").isInstanceOf[Int])
+            config("mini_batch_size").asInstanceOf[Int]
+          else 64
+        )
       } catch {
         case e: Throwable => e.printStackTrace()
       }

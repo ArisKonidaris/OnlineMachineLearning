@@ -14,9 +14,7 @@ case class MLPeriodicWorker() extends MLWorker[PullPush, Querier] with RemoteLea
 
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
-  def init(): Unit = {
-    if (getNodeId != 0) pull()
-  }
+  def init(): Unit = if (getNodeId != 0) pull()
 
   /**
     * The consumption of a data point by the Machine Learning worker.
