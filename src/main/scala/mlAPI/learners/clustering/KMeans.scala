@@ -2,7 +2,7 @@ package mlAPI.learners.clustering
 
 import mlAPI.math.Breeze._
 import mlAPI.math.{DenseVector, Point, UnlabeledPoint, Vector}
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.{Learner, NonParallelizable, OnlineLearner}
 import mlAPI.parameters.{Bucket, EuclideanVector, LearningParameters, ParameterDescriptor, VectorList}
 import mlAPI.scores.Scores
 
@@ -15,7 +15,7 @@ import scala.util.Random
   * Inspired from
   * http://www.cs.princeton.edu/courses/archive/fall08/cos436/Duda/C/sk_means.htm
   */
-case class KMeans() extends OnlineLearner with Clusterer with Serializable {
+case class KMeans() extends OnlineLearner with Clusterer with NonParallelizable with Serializable {
 
   private var counts: ListBuffer[Long] = _
 

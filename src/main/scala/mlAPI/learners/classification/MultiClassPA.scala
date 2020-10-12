@@ -2,7 +2,7 @@ package mlAPI.learners.classification
 
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
 import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias, VectorBiasList}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.scores.Scores
@@ -14,7 +14,7 @@ import scala.collection.JavaConverters._
 /**
   * Multi-class Passive Aggressive Classifier.
   */
-case class MultiClassPA() extends OnlineLearner with Classifier with Serializable {
+case class MultiClassPA() extends OnlineLearner with Classifier with Parallelizable with Serializable {
 
   protected var updateType: String = "PA-II"
 

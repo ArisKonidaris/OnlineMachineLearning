@@ -1,6 +1,6 @@
 package mlAPI.learners.classification
 
-import mlAPI.learners.PassiveAggressiveLearners
+import mlAPI.learners.{Parallelizable, PassiveAggressiveLearners}
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
 import mlAPI.parameters.VectorBias
@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 /**
   * Passive Aggressive Classifier.
   */
-case class PA() extends PassiveAggressiveLearners with Classifier with Serializable {
+case class PA() extends PassiveAggressiveLearners with Classifier with Parallelizable with Serializable {
 
   override def predict(data: Point): Option[Double] = {
     predictWithMargin(data) match {

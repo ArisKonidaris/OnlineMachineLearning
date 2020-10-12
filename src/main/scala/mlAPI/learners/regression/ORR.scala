@@ -2,7 +2,7 @@ package mlAPI.learners.regression
 
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
 import mlAPI.parameters.{Bucket, LearningParameters, MatrixBias, ParameterDescriptor}
 
 import scala.collection.mutable
@@ -14,7 +14,7 @@ import mlAPI.scores.Scores
 /**
   * Online Ridge Regression.
   */
-case class ORR() extends OnlineLearner with Regressor with Serializable {
+case class ORR() extends OnlineLearner with Regressor with Parallelizable with Serializable {
 
   protected var weights: MatrixBias = _
 

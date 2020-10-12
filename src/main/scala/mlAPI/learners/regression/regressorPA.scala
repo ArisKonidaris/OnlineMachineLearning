@@ -2,7 +2,7 @@ package mlAPI.learners.regression
 
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.learners.{Learner, PassiveAggressiveLearners}
+import mlAPI.learners.{Learner, Parallelizable, PassiveAggressiveLearners}
 import mlAPI.parameters.{VectorBias => lin_params}
 import mlAPI.scores.Scores
 
@@ -11,7 +11,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
-case class regressorPA() extends PassiveAggressiveLearners with Regressor with Serializable {
+case class regressorPA() extends PassiveAggressiveLearners with Regressor with Parallelizable with Serializable {
 
   weights = new lin_params()
 

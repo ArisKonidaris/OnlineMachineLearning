@@ -1,7 +1,7 @@
 package mlAPI.learners.classification
 
 import mlAPI.math.Breeze._
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
 import mlAPI.math.{LabeledPoint, Point, Vector}
 import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias}
 import mlAPI.scores.Scores
@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-case class SVM() extends OnlineLearner with Classifier with Serializable {
+case class SVM() extends OnlineLearner with Classifier with Parallelizable with Serializable {
 
   protected var C: Double = 0.01
 

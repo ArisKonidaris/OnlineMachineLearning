@@ -66,17 +66,7 @@ object Scores {
         }
         val precision: Double = frac(truePositive, falsePositive)
         val recall: Double = frac(truePositive, falseNegative)
-        println("################################")
-        println("truePositive: " + truePositive)
-        println("falseNegative: " + falseNegative)
-        println("falsePositive: " + falsePositive)
-        println("trueNegative: " + trueNegative)
-        println("precision: " + precision)
-        println("recall: " + recall)
-        if (precision + recall == 0)
-          0D
-        else
-          2D * (precision * recall) / (precision + recall)
+        if (precision + recall == 0) 0D else 2D * (precision * recall) / (precision + recall)
       } else 0.0
     } catch {
       case _: Throwable => 0.0
