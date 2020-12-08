@@ -1,9 +1,10 @@
 package mlAPI.learners.clustering
 
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{DenseVector, Point, UnlabeledPoint, Vector}
-import mlAPI.learners.{Learner, NonParallelizable, OnlineLearner}
-import mlAPI.parameters.{Bucket, EuclideanVector, LearningParameters, ParameterDescriptor, VectorList}
+import mlAPI.math.{DenseVector, Point, UnlabeledPoint}
+import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.parameters.{EuclideanVector, LearningParameters, ParameterDescriptor, VectorList}
 import mlAPI.scores.Scores
 
 import scala.collection.JavaConverters._
@@ -15,7 +16,9 @@ import scala.util.Random
   * Inspired from
   * http://www.cs.princeton.edu/courses/archive/fall08/cos436/Duda/C/sk_means.htm
   */
-case class KMeans() extends OnlineLearner with Clusterer with NonParallelizable with Serializable {
+case class KMeans() extends OnlineLearner with Clusterer with Serializable {
+
+  override protected val parallelizable: Boolean = false
 
   private var counts: ListBuffer[Long] = _
 
@@ -280,11 +283,11 @@ case class KMeans() extends OnlineLearner with Clusterer with NonParallelizable 
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorList().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
+  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
     new VectorList().generateSerializedParams
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("KMeans",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("KMeans",
       Map[String, AnyRef](
         ("nClusters", nClusters.asInstanceOf[AnyRef]),
         ("initMethod", initMethod.asInstanceOf[AnyRef]),
@@ -307,7 +310,9 @@ case class KMeans() extends OnlineLearner with Clusterer with NonParallelizable 
             (for (initFeat <- initFeatures) yield initFeat.getNumericVector.asDenseBreeze.data)
               .toArray.asInstanceOf[AnyRef]
         )
-      ).asJava
+      ).asJava,
+      null
     )
   }
+
 }

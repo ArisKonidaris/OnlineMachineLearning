@@ -1,5 +1,6 @@
 package mlAPI.preprocessing
 
+import ControlAPI.PreprocessorPOJO
 import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint}
 
 import scala.collection.mutable
@@ -58,9 +59,10 @@ case class PolynomialFeatures() extends Preprocessor {
     this
   }
 
-  override def generatePOJOPreprocessor: ControlAPI.Preprocessor = {
-    new ControlAPI.Preprocessor("PolynomialFeatures",
+  override def generatePOJOPreprocessor: PreprocessorPOJO = {
+    new PreprocessorPOJO("PolynomialFeatures",
       Map[String, AnyRef](("degree", degree.asInstanceOf[AnyRef])).asJava,
+      null,
       null
     )
   }

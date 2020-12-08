@@ -1,6 +1,6 @@
-package mlAPI.mlworkers.interfaces
+package mlAPI.protocols.periodic
 
-import BipartiteTopologyAPI.annotations.{DefaultOp, RemoteOp, RemoteProxy}
+import BipartiteTopologyAPI.annotations.{RemoteOp, RemoteProxy}
 import mlAPI.parameters.ParameterDescriptor
 
 @RemoteProxy

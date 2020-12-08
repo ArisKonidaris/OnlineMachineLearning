@@ -1,9 +1,10 @@
 package mlAPI.preprocessing
 
+import ControlAPI.PreprocessorPOJO
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import breeze.numerics.sqrt
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point, UnlabeledPoint, Vector, DenseVector}
+import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint, Vector}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -166,14 +167,15 @@ case class StandardScaler() extends learningPreprocessor {
     this
   }
 
-  override def generatePOJOPreprocessor: ControlAPI.Preprocessor = {
-    new ControlAPI.Preprocessor("StandardScaler",
+  override def generatePOJOPreprocessor: PreprocessorPOJO = {
+    new PreprocessorPOJO("StandardScaler",
       Map[String, AnyRef](("learn", learnable.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
-        ("mean", if(mean == null) null else mean.data.asInstanceOf[AnyRef]),
-        ("variance", if(d_squared == null) null else getVariance.data.asInstanceOf[AnyRef]),
+        ("mean", if (mean == null) null else mean.data.asInstanceOf[AnyRef]),
+        ("variance", if (d_squared == null) null else getVariance.data.asInstanceOf[AnyRef]),
         ("count", count.asInstanceOf[AnyRef])
-      ).asJava
+      ).asJava,
+      null
     )
   }
 

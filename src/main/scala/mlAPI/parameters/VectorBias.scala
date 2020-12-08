@@ -6,10 +6,10 @@ import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSp
 import scala.collection.mutable.ListBuffer
 
 /** This class represents a weight vector with an intercept (bias).
-  *
-  * @param weights   The vector of parameters.
-  * @param intercept The intercept (bias) weight.
-  */
+ *
+ * @param weights   The vector of parameters.
+ * @param intercept The intercept (bias) weight.
+ */
 case class VectorBias(var weights: BreezeDenseVector[Double], var intercept: Double)
   extends BreezeParameters {
 
@@ -111,9 +111,17 @@ case class VectorBias(var weights: BreezeDenseVector[Double], var intercept: Dou
       intercept
     })
 
-  override def generateSerializedParams: (LearningParameters, Boolean, Bucket) => (Array[Int], Vector) = {
-    (params: LearningParameters, sparse: Boolean, bucket: Bucket) =>
-      (Array(params.asInstanceOf[VectorBias].weights.length, 1), params.slice(bucket, sparse))
+  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+    (lPar: LearningParameters, par: Array[_]) =>
+      try {
+        assert(par.length == 2 && lPar.isInstanceOf[VectorBias])
+        val sparse: Boolean = par.head.asInstanceOf[Boolean]
+        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
+        (Array(lPar.asInstanceOf[VectorBias].weights.length, 1), lPar.asInstanceOf[VectorBias].slice(bucket, sparse))
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while Serializing the VectorBias learning parameters.")
+      }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {

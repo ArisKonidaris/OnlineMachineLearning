@@ -1,14 +1,19 @@
 package mlAPI.learners
 
 import mlAPI.math.Breeze._
-import mlAPI.math.{Point, Vector}
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias}
+import mlAPI.math.Point
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, VectorBias}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import com.google.common.collect.{BiMap, HashBiMap}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 abstract class PassiveAggressiveLearners extends OnlineLearner {
+
+  override protected val parallelizable: Boolean = true
+
+//  protected var classMap: BiMap[Double, Double] = HashBiMap.create[Double, Double]()
 
   protected var updateType: String = "PA-II"
 
@@ -66,6 +71,16 @@ abstract class PassiveAggressiveLearners extends OnlineLearner {
     this
   }
 
+//  def setClassMap(classMap: BiMap[Double, Int]): PassiveAggressiveLearners = {
+//    this.classMap = classMap
+//    this
+//  }
+//
+//  def getClassMap: BiMap[Double, Int] = {
+//    val value: BiMap[Double, Int] = classMap
+//    value
+//  }
+
   override def setParametersFromMap(parameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((parameter, value) <- parameterMap) {
       parameter match {
@@ -97,7 +112,7 @@ abstract class PassiveAggressiveLearners extends OnlineLearner {
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
+  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
     new VectorBias().generateSerializedParams
 
 }

@@ -1,9 +1,10 @@
 package mlAPI.learners.regression
 
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
-import mlAPI.parameters.{Bucket, LearningParameters, MatrixBias, ParameterDescriptor}
+import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.parameters.{LearningParameters, MatrixBias, ParameterDescriptor}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -14,7 +15,9 @@ import mlAPI.scores.Scores
 /**
   * Online Ridge Regression.
   */
-case class ORR() extends OnlineLearner with Regressor with Parallelizable with Serializable {
+case class ORR() extends OnlineLearner with Regressor with Serializable {
+
+  override protected val parallelizable: Boolean = true
 
   protected var weights: MatrixBias = _
 
@@ -90,10 +93,10 @@ case class ORR() extends OnlineLearner with Regressor with Parallelizable with S
             if (weights == null || weights.A.size == new_weights.size)
               weights.A = new_weights
             else
-              throw new RuntimeException("Invalid size of new A matrix for the ORR regressor")
+              throw new RuntimeException("Invalid size of new A matrix for the ORR regressor.")
           } catch {
             case e: Exception =>
-              println("Error while trying to update the matrix A of ORR regressor")
+              println("Error while trying to update the matrix A of ORR regressor.")
               e.printStackTrace()
           }
         case "b" =>
@@ -102,10 +105,10 @@ case class ORR() extends OnlineLearner with Regressor with Parallelizable with S
             if (weights == null || weights.b.size == new_bias.size)
               weights.b = new_bias
             else
-              throw new RuntimeException("Invalid size of new b vector for the ORR regressor")
+              throw new RuntimeException("Invalid size of new b vector for the ORR regressor.")
           } catch {
             case e: Exception =>
-              println("Error while trying to update the intercept flag of ORR regressor")
+              println("Error while trying to update the intercept flag of ORR regressor.")
               e.printStackTrace()
           }
         case _ =>
@@ -122,7 +125,7 @@ case class ORR() extends OnlineLearner with Regressor with Parallelizable with S
             setLambda(value.asInstanceOf[Double])
           } catch {
             case e: Exception =>
-              println("Error while trying to update the epsilon hyperparameter of PA regressor")
+              println("Error while trying to update the epsilon hyperparameter of PA regressor.")
               e.printStackTrace()
           }
         case _ =>
@@ -133,19 +136,20 @@ case class ORR() extends OnlineLearner with Regressor with Parallelizable with S
 
   override def toString: String = s"ORR ${this.hashCode}"
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("ORR",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("ORR",
       Map[String, AnyRef](("lambda", lambda.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
         ("a", if(weights == null) null else weights.A.data.asInstanceOf[AnyRef]),
         ("b", if(weights == null) null else weights.b.data.asInstanceOf[AnyRef])
-      ).asJava
+      ).asJava,
+      null
     )
   }
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new MatrixBias().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
+  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
     new MatrixBias().generateSerializedParams
 
 }

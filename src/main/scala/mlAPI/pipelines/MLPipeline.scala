@@ -1,12 +1,13 @@
-package mlAPI.mlpipeline
+package mlAPI.pipelines
 
-import ControlAPI.{Request, Learner => POJOLearner, Preprocessor => POJOPreprocessor, Transformer => POJOTransformer}
+import ControlAPI.{Request, LearnerPOJO => POJOLearner, PreprocessorPOJO => POJOPreprocessor}
+import ControlAPI.{TransformerPOJO => POJOTransformer}
 import mlAPI.dataBuffers.DataSet
-import mlAPI.math.Point
+import mlAPI.math.{Point, Vector}
 import mlAPI.learners.Learner
 import mlAPI.learners.classification.{MultiClassPA, PA, SVM}
 import mlAPI.learners.regression.{ORR, regressorPA}
-import mlAPI.parameters.{Bucket, ParameterDescriptor, WithParams}
+import mlAPI.parameters.{Bucket, VectoredParameters, HTParameters, ParameterDescriptor, WithParams}
 import mlAPI.preprocessing.{PolynomialFeatures, Preprocessor, StandardScaler}
 
 import scala.collection.mutable
@@ -202,11 +203,9 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     pipePoints(testSet, preprocess, learner.score)
   }
 
-  private def incrementFitCount(mini_batch: Long): Unit = {
+  private def incrementFitCount(mini_batch: Long = 1): Unit = {
     if (fitted_data < Long.MaxValue - mini_batch) fitted_data += mini_batch else fitted_data = Long.MaxValue
   }
-
-  private def incrementFitCount(): Unit = incrementFitCount(1)
 
   def merge(mlPipeline: MLPipeline): MLPipeline = {
     incrementFitCount(mlPipeline.getFittedData)
@@ -217,9 +216,33 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
 
   def generateDescriptor(): ParameterDescriptor = {
     if (learner != null && learner.getParameters.isDefined) {
-      val (sizes, parameters) = getLearner
-        .getSerializedParams(getLearner.getParameters.get, false, Bucket(0, getLearner.getParameters.get.getSize - 1))
-      ParameterDescriptor(sizes, parameters, Bucket(0, getLearner.getParameters.get.getSize - 1), fitted_data)
+      getLearner.getParameters.get match {
+        case _: VectoredParameters =>
+          val (sizes, parameters) = {
+            getLearner
+              .getSerializedParams(
+                getLearner.getParameters.get,
+                Array(false, Bucket(0, getLearner.getParameters.get.getSize - 1))
+              ).asInstanceOf[(Array[Int], Vector)]
+          }
+          ParameterDescriptor(
+            sizes,
+            parameters,
+            Bucket(0, getLearner.getParameters.get.getSize - 1),
+            null,
+            null,
+            fitted_data
+          )
+        case _: HTParameters =>
+          ParameterDescriptor(
+            null,
+            null,
+            null,
+            getLearner.getSerializedParams(getLearner.getParameters.get, null),
+            null,
+            fitted_data
+          )
+      }
     } else new ParameterDescriptor()
   }
 

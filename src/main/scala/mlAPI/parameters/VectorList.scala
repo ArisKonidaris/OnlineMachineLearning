@@ -150,7 +150,7 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
     params match {
       case VectorList(vs: ListBuffer[EuclideanVector]) =>
         this + VectorList(for (v <- vs) yield (v * -1.0).asInstanceOf[EuclideanVector])
-      case v: Vector =>
+      case v: EuclideanVector =>
         this + (v * -1.0)
       case _ => throw new RuntimeException("The provided LearningParameter Object is non-compatible " +
         "for subtraction with a VectorList Object.")
@@ -164,7 +164,7 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
     params match {
       case VectorList(vs: ListBuffer[EuclideanVector]) =>
         this += VectorList(for (v <- vs) yield (v * -1.0).asInstanceOf[EuclideanVector])
-      case v: Vector =>
+      case v: EuclideanVector =>
         this += (v * -1.0)
       case _ => throw new RuntimeException("The provided LearningParameter Object is non-compatible " +
         "for subtraction with a VectorList Object.")
@@ -208,9 +208,20 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
   override def flatten: BreezeDenseVector[Double] =
     (for (vector: EuclideanVector <- vectors) yield vector.flatten).reduce((x, y) => BreezeDenseVector.vertcat(x, y))
 
-  override def generateSerializedParams: (LearningParameters, Boolean, Bucket) => (Array[Int], Vector) = {
-    (params: LearningParameters, sparse: Boolean, bucket: Bucket) =>
-      ((for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray, params.slice(bucket, sparse))
+  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+    (lPar: LearningParameters, par: Array[_]) =>
+      try {
+        assert(par.length == 2 && lPar.isInstanceOf[VectorList])
+        val sparse: Boolean = par.head.asInstanceOf[Boolean]
+        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
+        (
+          (for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray,
+          lPar.asInstanceOf[VectorList].slice(bucket, sparse)
+        )
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while Serializing the VectorList learning parameters.")
+      }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {

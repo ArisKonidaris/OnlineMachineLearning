@@ -1,4 +1,4 @@
-package mlAPI.mlParameterServers
+package mlAPI.protocols.periodic
 
 import BipartiteTopologyAPI.annotations.{RemoteOp, RemoteProxy}
 import BipartiteTopologyAPI.futures.Response

@@ -49,12 +49,15 @@ trait Point extends Serializable {
     )
   }
 
+  def asUnlabeledPoint: UnlabeledPoint = UnlabeledPoint(numericVector, discreteVector, categoricalVector)
+
 }
 
-/** A data point without a label. Could be used for
+/**
+ * A data point without a label. Could be used for
  * prediction or unsupervised machine learning.
  *
- * @param numericVector  The numeric features.
+ * @param numericVector The numeric features.
  * @param discreteVector The discrete features.
  * @param categoricalVector The categorical features.
  */
@@ -88,8 +91,9 @@ case class UnlabeledPoint(var numericVector: Vector, var discreteVector: Vector,
 
 }
 
-/** This class represents a vector with an associated label as it is
- * required for many supervised learning tasks.
+/**
+ * This class represents a vector with an associated label as
+ * it is required for many supervised learning tasks.
  *
  * @param label  Label of the data point.
  * @param numericVector  The numeric features.

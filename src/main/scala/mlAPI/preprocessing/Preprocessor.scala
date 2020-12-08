@@ -1,15 +1,16 @@
 package mlAPI.preprocessing
 
+import ControlAPI.PreprocessorPOJO
 import mlAPI.math.Point
 import mlAPI.parameters.WithParams
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/** The basic trait for data pre processing methods.
-  * All those methods contain hyperparameters.
-  *
-  */
+/**
+ * The basic trait for data pre processing methods.
+ * All those methods contain hyper-parameters.
+ */
 trait Preprocessor extends Serializable with WithParams {
 
   // =============================== Data transformation methods ===================================
@@ -18,7 +19,7 @@ trait Preprocessor extends Serializable with WithParams {
 
   def transform(dataSet: ListBuffer[Point]): ListBuffer[Point]
 
-  def generatePOJOPreprocessor: ControlAPI.Preprocessor
+  def generatePOJOPreprocessor: PreprocessorPOJO
 
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Preprocessor = this
 

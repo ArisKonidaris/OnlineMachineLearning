@@ -9,7 +9,7 @@ import scala.collection.mutable.ListBuffer
   * A trait for determining if the Learning Parameters are
   * represented by the Breeze library.
   */
-trait BreezeParameters extends LearningParameters {
+trait BreezeParameters extends VectoredParameters {
 
   def flatten: BreezeDenseVector[Double]
 

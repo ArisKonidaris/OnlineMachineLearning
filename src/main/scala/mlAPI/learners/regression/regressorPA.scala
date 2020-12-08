@@ -1,8 +1,9 @@
 package mlAPI.learners.regression
 
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.learners.{Learner, Parallelizable, PassiveAggressiveLearners}
+import mlAPI.learners.{Learner, PassiveAggressiveLearners}
 import mlAPI.parameters.{VectorBias => lin_params}
 import mlAPI.scores.Scores
 
@@ -11,7 +12,7 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
-case class regressorPA() extends PassiveAggressiveLearners with Regressor with Parallelizable with Serializable {
+case class regressorPA() extends PassiveAggressiveLearners with Regressor with Serializable {
 
   weights = new lin_params()
 
@@ -78,8 +79,8 @@ case class regressorPA() extends PassiveAggressiveLearners with Regressor with P
 
   override def toString: String = s"PA regressor ${this.hashCode}"
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("regressorPA",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("regressorPA",
       Map[String, AnyRef](
         ("C", C.asInstanceOf[AnyRef]),
         ("epsilon", epsilon.asInstanceOf[AnyRef])
@@ -87,7 +88,8 @@ case class regressorPA() extends PassiveAggressiveLearners with Regressor with P
       Map[String, AnyRef](
         ("a", if(weights == null) null else weights.weights.data.asInstanceOf[AnyRef]),
         ("b", if(weights == null) null else weights.intercept.asInstanceOf[AnyRef])
-      ).asJava
+      ).asJava,
+      null
     )
   }
 

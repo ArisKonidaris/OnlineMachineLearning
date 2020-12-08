@@ -1,9 +1,10 @@
 package mlAPI.learners.classification
 
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias, VectorBiasList}
+import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, VectorBias, VectorBiasList}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.scores.Scores
 
@@ -14,7 +15,10 @@ import scala.collection.JavaConverters._
 /**
   * Multi-class Passive Aggressive Classifier.
   */
-case class MultiClassPA() extends OnlineLearner with Classifier with Parallelizable with Serializable {
+case class MultiClassPA(override protected var targetLabel: Double = 1.0)
+  extends OnlineLearner with Classifier with Serializable {
+
+  override protected val parallelizable: Boolean = true
 
   protected var updateType: String = "PA-II"
 
@@ -84,7 +88,7 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Paralleliza
   }
 
   override def score(test_set: ListBuffer[Point]): Double =
-    Scores.accuracy(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+    Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   private def tau(loss: Double, data: Point): Double = {
     updateType match {
@@ -188,11 +192,11 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Paralleliza
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBiasList().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
+  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
     new VectorBiasList().generateSerializedParams
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("MulticlassPA",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("MulticlassPA",
       Map[String, AnyRef](("C", C.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
         ("weights",
@@ -201,7 +205,8 @@ case class MultiClassPA() extends OnlineLearner with Classifier with Paralleliza
           else
             (for (weight <- weights.vectorBiases) yield weight.flatten.data).toArray.asInstanceOf[AnyRef]
         )
-      ).asJava
+      ).asJava,
+      null
     )
   }
 

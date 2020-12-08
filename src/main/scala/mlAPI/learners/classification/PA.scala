@@ -1,6 +1,7 @@
 package mlAPI.learners.classification
 
-import mlAPI.learners.{Parallelizable, PassiveAggressiveLearners}
+import ControlAPI.LearnerPOJO
+import mlAPI.learners.PassiveAggressiveLearners
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
 import mlAPI.parameters.VectorBias
@@ -13,7 +14,8 @@ import scala.collection.JavaConverters._
 /**
   * Passive Aggressive Classifier.
   */
-case class PA() extends PassiveAggressiveLearners with Classifier with Parallelizable with Serializable {
+case class PA(override protected var targetLabel: Double = 1.0)
+  extends PassiveAggressiveLearners with Classifier with Serializable {
 
   override def predict(data: Point): Option[Double] = {
     predictWithMargin(data) match {
@@ -47,7 +49,7 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Paralleli
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
-  private def createLabel(label: Double): Double = if (label == 0.0) -1.0 else label
+  private def createLabel(label: Double): Double = if (label != targetLabel) -1.0 else label
 
   override def toString: String = s"PA classifier ${this.hashCode}"
 
@@ -76,14 +78,17 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Paralleli
     this
   }
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("PA",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("PA",
       Map[String, AnyRef](("C", C.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
         ("a", if(weights == null) null else weights.weights.data.asInstanceOf[AnyRef]),
         ("b", if(weights == null) null else weights.intercept.asInstanceOf[AnyRef])
-      ).asJava
+      ).asJava,
+      null
     )
   }
+
+
 
 }

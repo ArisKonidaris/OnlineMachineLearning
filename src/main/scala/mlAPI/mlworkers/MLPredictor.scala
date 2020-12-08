@@ -4,10 +4,10 @@ import BipartiteTopologyAPI.NodeInstance
 import BipartiteTopologyAPI.annotations.{DefaultOp, InitOp, MergeOp, ProcessOp, QueryOp}
 import ControlAPI.{DataInstance, Prediction, Request}
 import mlAPI.math.{DenseVector, SparseVector, UnlabeledPoint, Vector}
-import mlAPI.mlParameterServers.PullPush
-import mlAPI.mlpipeline.MLPipeline
-import mlAPI.mlworkers.interfaces.{MLPredictorRemote, RemoteLearner}
+import mlAPI.pipelines.MLPipeline
+import mlAPI.mlworkers.interfaces.MLPredictorRemote
 import mlAPI.parameters.{LearningParameters, ParameterDescriptor}
+import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 
 import scala.collection.mutable
 import scala.collection.JavaConverters._

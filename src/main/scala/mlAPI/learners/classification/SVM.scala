@@ -1,9 +1,10 @@
 package mlAPI.learners.classification
 
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.learners.{Learner, OnlineLearner, Parallelizable}
-import mlAPI.math.{LabeledPoint, Point, Vector}
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectorBias}
+import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, VectorBias}
 import mlAPI.scores.Scores
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
@@ -11,7 +12,10 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-case class SVM() extends OnlineLearner with Classifier with Parallelizable with Serializable {
+case class SVM(override protected var targetLabel: Double = 1.0)
+  extends OnlineLearner with Classifier with Serializable {
+
+  override protected val parallelizable: Boolean = true
 
   protected var C: Double = 0.01
 
@@ -152,16 +156,17 @@ case class SVM() extends OnlineLearner with Classifier with Parallelizable with 
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector) =
+  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
     new VectorBias().generateSerializedParams
 
-  override def generatePOJOLearner: ControlAPI.Learner = {
-    new ControlAPI.Learner("SVM",
+  override def generatePOJOLearner: LearnerPOJO = {
+    new LearnerPOJO("SVM",
       Map[String, AnyRef](("C", C.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
         ("a", if(weights == null) null else weights.weights.data.asInstanceOf[AnyRef]),
         ("b", if(weights == null) null else weights.intercept.asInstanceOf[AnyRef])
-      ).asJava
+      ).asJava,
+      null
     )
   }
 

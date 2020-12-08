@@ -1,17 +1,22 @@
 package mlAPI.learners
 
-import mlAPI.math.Vector
+import ControlAPI.LearnerPOJO
 import mlAPI.math.Point
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, WithParams}
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, WithParams}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/** Contains the necessary methods needed by the workers/slave node
-  * to train on it's local incoming data stream.
-  */
+/**
+ * Contains the necessary methods needed by the workers/slave node
+ * to train on it's local incoming data stream.
+ */
 trait Learner extends Serializable with WithParams {
 
+  // An immutable variable that determines if the Learner can be parallelized.
+  protected val parallelizable: Boolean
+
+  // An integer indicating the update complexity of the Learner on a single data point.
   protected var update_complexity: Int = _
 
   // ===================================== Getters ================================================
@@ -26,9 +31,7 @@ trait Learner extends Serializable with WithParams {
 
   def setUpdateComplexity(update_complexity: Int): Unit = this.update_complexity = update_complexity
 
-
   // ==================================== Main methods =============================================
-
 
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = this
 
@@ -42,7 +45,9 @@ trait Learner extends Serializable with WithParams {
 
   override def removeParameter(key: String, value: AnyRef): Learner = this
 
-  def initialize_model(data: Point): Unit
+  def initialize_model(): Unit = ()
+
+  def initialize_model(data: Point): Unit = ()
 
   def predict(data: Point): Option[Double]
 
@@ -58,8 +63,8 @@ trait Learner extends Serializable with WithParams {
 
   def generateParameters: ParameterDescriptor => LearningParameters
 
-  def getSerializedParams: (LearningParameters , Boolean, Bucket) => (Array[Int], Vector)
+  def getSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable
 
-  def generatePOJOLearner: ControlAPI.Learner
+  def generatePOJOLearner: LearnerPOJO
 
 }

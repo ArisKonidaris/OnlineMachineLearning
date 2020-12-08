@@ -1,15 +1,15 @@
 package mlAPI.parameters
 
-import mlAPI.math.{DenseVector, SparseVector, Vector}
+import mlAPI.math.DenseVector
 
 import breeze.linalg.{DenseMatrix => BreezeDenseMatrix, DenseVector => BreezeDenseVector}
 import scala.collection.mutable.ListBuffer
 
 /** This class represents a weight matrix with an intercept (bias) vector.
-  *
-  * @param A The matrix of parameters.
-  * @param b The intercept (bias) vector weight.
-  */
+ *
+ * @param A The matrix of parameters.
+ * @param b The intercept (bias) vector weight.
+ */
 case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector[Double])
   extends BreezeParameters {
 
@@ -94,10 +94,20 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
 
   override def flatten: BreezeDenseVector[Double] = BreezeDenseVector.vertcat(A.toDenseVector, b)
 
-  override def generateSerializedParams: (LearningParameters, Boolean, Bucket) => (Array[Int], Vector) = {
-    (params: LearningParameters, sparse: Boolean, bucket: Bucket) =>
-      (Array(params.asInstanceOf[MatrixBias].A.size, params.asInstanceOf[MatrixBias].b.size),
-        params.slice(bucket, sparse))
+  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+    (lPar: LearningParameters, par: Array[_]) =>
+      try {
+        assert(par.length == 2 && lPar.isInstanceOf[MatrixBias])
+        val sparse: Boolean = par.head.asInstanceOf[Boolean]
+        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
+        (
+          Array(lPar.asInstanceOf[MatrixBias].A.size, lPar.asInstanceOf[MatrixBias].b.size),
+          lPar.asInstanceOf[MatrixBias].slice(bucket, sparse)
+        )
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while Serializing the MatrixBias learning parameters.")
+      }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {

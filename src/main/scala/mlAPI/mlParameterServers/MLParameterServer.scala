@@ -1,4 +1,4 @@
-package mlAPI.mlParameterServers.parameterServers
+package mlAPI.mlParameterServers
 
 import BipartiteTopologyAPI.NodeInstance
 import ControlAPI.Request
@@ -11,6 +11,16 @@ import mlAPI.parameters.ParameterDescriptor
  * @tparam QueryIfc  The remote interface of the querier.
  */
 abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[WorkerIfc, QueryIfc] {
+
+  /**
+   * The total number of models that the parameter server received.
+   */
+  protected var modelsReceived: Long = 0
+
+  /**
+   * The total number of models sent to the workers.
+   */
+  protected var modelsSent: Long = 0
 
   /**
    * The cumulative loss of the distributed Machine Learning training.
@@ -48,7 +58,10 @@ abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[Worke
 
   /** This method configures the Parameter Server Node by using a creation Request.
    * Right now this method does not provide any functionality. It exists for configuring
-   * more complex parameter server that may be developed later on. */
+   * more complex parameter server that may be developed later on.
+   *
+   * @param request The [[Request]] instance to configure the parameter server.
+   * */
   def configureParameterServer(request: Request): MLParameterServer[WorkerIfc, QueryIfc] = {
     this
   }
@@ -61,8 +74,30 @@ abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[Worke
     this
   }
 
-  def incrementNumberOfFittedData(size: Long): Unit = {
-    if (fitted != Long.MaxValue) if (fitted < Long.MaxValue - size) fitted += size else fitted = Long.MaxValue
+  /** A counter used for keeping track of the number of data points fitted on the global model. */
+  def incrementNumberOfFittedData(size: Long): Unit = fitted = incrementLong(fitted, size)
+
+  /** A counter used for keeping track of the number of data points fitted on the global model. */
+  def incrementNumberOfReceivedModels(size: Long = 1): Unit = modelsReceived = incrementLong(modelsReceived, size)
+
+  /** A counter used for keeping track of the number of data points fitted on the global model. */
+  def incrementNumberOfShippedModels(size: Long = 1): Unit = modelsSent = incrementLong(modelsSent, size)
+
+  def incrementLong(variable: Long, size: Long): Long = {
+    if (variable != Long.MaxValue)
+      if (variable < Long.MaxValue - size)
+        variable + size
+      else
+        Long.MaxValue
+    else
+      variable
+  }
+
+  def printStatistics(): Unit = {
+    println("Fitted: " + fitted)
+    println("Models Received: " + modelsReceived)
+    println("Models Sent: " + modelsSent)
+    println("Communication: " + (modelsReceived + modelsSent))
   }
 
 }
