@@ -110,7 +110,13 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   /** Sending the safe zone function value to the coordinator. */
   override def requestZeta(): Unit = {
     activeSubRound = false // Stop calculating and sending increments.
-    assert(globalModel != null)
+    try {
+      assert(globalModel != null)
+    } catch {
+      case e: Throwable =>
+        println("Worker" + getNodeId + " has null globalModel.")
+        e.printStackTrace()
+    }
     assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
     tempZeta = safeZone.zeta(
       globalModel.asInstanceOf[BreezeParameters],
