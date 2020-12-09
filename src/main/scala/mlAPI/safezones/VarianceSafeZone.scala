@@ -13,8 +13,18 @@ case class VarianceSafeZone(private var threshold: Double = 0.008)
   var sqrtThreshold: Double = scala.math.sqrt(threshold)
 
   /** Calculation of the Zeta safe zone function. */
-  override def zeta(globalModel: BreezeParameters, model: BreezeParameters): Double =
-    sqrtThreshold - scala.math.sqrt(breeze.linalg.norm(globalModel.flatten - model.flatten))
+  override def zeta(globalModel: BreezeParameters, model: BreezeParameters): Double = {
+    try {
+      assert(globalModel != null)
+      assert(model != null)
+      sqrtThreshold - scala.math.sqrt(breeze.linalg.norm(globalModel.flatten - model.flatten))
+    } catch {
+      case e: Throwable =>
+        e.printStackTrace()
+        throw new RuntimeException("Check this.")
+    }
+
+  }
 
   override def newRoundZeta(): Double = sqrtThreshold
 

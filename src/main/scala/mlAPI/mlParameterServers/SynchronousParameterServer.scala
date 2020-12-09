@@ -108,7 +108,7 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
     val remoteVector: BreezeDenseVector[Double] = deserializeVector(remoteModelDescriptor)
     incrementNumberOfFittedData(remoteModelDescriptor.getFitted)
     incrementNumberOfReceivedModels()
-    printStatistics()
+//    printStatistics()
     if (globalModel == null) {
       assertWarmup(remoteModelDescriptor)
       globalModel = remoteVector

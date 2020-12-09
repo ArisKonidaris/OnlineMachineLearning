@@ -103,7 +103,7 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
     val remoteVector: BreezeDenseVector[Double] = deserializeVector(remoteModelDescriptor)
     incrementNumberOfFittedData(remoteModelDescriptor.getFitted)
     incrementNumberOfReceivedModels()
-    printStatistics()
+//    printStatistics()
     try {
       globalModel += (remoteVector * (1.0 / (1.0 * getNumberOfSpokes)))
     } catch {
