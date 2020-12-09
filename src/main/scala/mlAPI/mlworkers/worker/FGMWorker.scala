@@ -114,10 +114,16 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
       assert(globalModel != null)
     } catch {
       case e: Throwable =>
-        println("Worker" + getNodeId + " has null globalModel.")
+        println("Worker " + getNodeId + " has null globalModel.")
         e.printStackTrace()
     }
-    assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
+    try {
+      assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
+    } catch {
+      case e: Throwable =>
+        println("Worker " + getNodeId + " has null local model.")
+        e.printStackTrace()
+    }
     tempZeta = safeZone.zeta(
       globalModel.asInstanceOf[BreezeParameters],
       getLearnerParams.asInstanceOf[Option[BreezeParameters]].get
