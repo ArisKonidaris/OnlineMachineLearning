@@ -55,6 +55,22 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
     activeSubRound = true // Reset the active sub round flag.
     subRound += 1 // Update the current running subround.
     println("Worker: " + getNodeId + " started new round: " + subRound + ", zeta: " + zeta)
+
+    try {
+      assert(globalModel != null)
+    } catch {
+      case e: Throwable =>
+        println("Null global model after new round in worker " + getNodeId + " at subround " + subRound + ".")
+        e.printStackTrace()
+    }
+    try {
+      assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
+    } catch {
+      case e: Throwable =>
+        println("Null model after new round in worker " + getNodeId + " at subround " + subRound + ".")
+        e.printStackTrace()
+    }
+
   }
 
   /** The consumption of a data point by the Machine Learning worker.
@@ -114,18 +130,17 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
       assert(globalModel != null)
     } catch {
       case e: Throwable =>
-        println("Worker " + getNodeId + " has null globalModel.")
+        println("Worker " + getNodeId + " " + subRound + " has null globalModel.")
         e.printStackTrace()
     }
     try {
       assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
     } catch {
       case e: Throwable =>
-        println("Worker " + getNodeId + " has null local model.")
+        println("Worker " + getNodeId + " " + subRound + " has null local model.")
         e.printStackTrace()
     }
-    tempZeta = safeZone.zeta(
-      globalModel.asInstanceOf[BreezeParameters],
+    tempZeta = safeZone.zeta(globalModel.asInstanceOf[BreezeParameters],
       getLearnerParams.asInstanceOf[Option[BreezeParameters]].get
     )
     getProxy(0).receiveZeta(ZetaValue(tempZeta))
