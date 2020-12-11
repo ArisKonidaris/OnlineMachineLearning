@@ -162,7 +162,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
     if (sync.activeSubRound && numSubRounds == increment.subRound) {
       inc += increment.increment
       if (inc > sync.parallelism) {
-        phi = 0.0
+//        phi = 0.0
         sync.activeSubRound = false
         for (workerID: Int <- 0 until sync.parallelism)
           getProxy(workerID).requestZeta()
@@ -193,6 +193,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
         for (workerID: Int <- 0 until sync.parallelism)
           getProxy(workerID).sendLocalDrift()
       }
+      phi = 0.0
     }
   }
 
