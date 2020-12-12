@@ -16,8 +16,6 @@ import scala.collection.mutable.ListBuffer
 case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   extends VectoredWorker[FGMHubInterface, Querier] with FGMRemoteLearner {
 
-  println("FGM Worker initialized.")
-
   protocol = "FGM-protocol"
 
   /** The quantum of the FMG distributed learning protocol. */
@@ -40,7 +38,10 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
 
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
-  def init(): Unit = if (getNodeId != 0) pull()
+  def init(): Unit = {
+    println("Network: " + getNetworkID + "| FGM Worker " + getNodeId + " initialized.")
+    if (getNodeId != 0) pull()
+  }
 
   /** A method called each type the new global model arrives from the parameter server.
    *
@@ -54,23 +55,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
     processedData = 0 // Reset the processed data point counter.
     activeSubRound = true // Reset the active sub round flag.
     subRound += 1 // Update the current running subround.
-    println("Worker: " + getNodeId + " started new round: " + subRound + ", zeta: " + zeta)
-
-    try {
-      assert(globalModel != null)
-    } catch {
-      case e: Throwable =>
-        println("Null global model after new round in worker " + getNodeId + " at subround " + subRound + ".")
-        e.printStackTrace()
-    }
-    try {
-      assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
-    } catch {
-      case e: Throwable =>
-        println("Null model after new round in worker " + getNodeId + " at subround " + subRound + ".")
-        e.printStackTrace()
-    }
-
+//    println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + subRound + ", zeta: " + zeta)
   }
 
   /** The consumption of a data point by the Machine Learning worker.
@@ -126,20 +111,6 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   /** Sending the safe zone function value to the coordinator. */
   override def requestZeta(): Unit = {
     activeSubRound = false // Stop calculating and sending increments.
-    try {
-      assert(globalModel != null)
-    } catch {
-      case e: Throwable =>
-        println("Worker " + getNodeId + " " + subRound + " has null globalModel.")
-        e.printStackTrace()
-    }
-    try {
-      assert(getLearnerParams.asInstanceOf[Option[BreezeParameters]].get != null)
-    } catch {
-      case e: Throwable =>
-        println("Worker " + getNodeId + " " + subRound + " has null local model.")
-        e.printStackTrace()
-    }
     tempZeta = safeZone.zeta(globalModel.asInstanceOf[BreezeParameters],
       getLearnerParams.asInstanceOf[Option[BreezeParameters]].get
     )
@@ -205,7 +176,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
             case "ModelVariance" =>
               if (config.contains("threshold")) {
                 try {
-                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.008))
+                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.0008))
                 } catch {
                   case _: Throwable => VarianceSafeZone()
                 }
