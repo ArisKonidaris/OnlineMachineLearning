@@ -2,11 +2,12 @@ package mlAPI.mlParameterServers
 
 import java.io.Serializable
 import BipartiteTopologyAPI.annotations.{InitOp, MergeOp, ProcessOp, QueryOp}
-import BipartiteTopologyAPI.futures.{PromiseResponse, Response}
+import BipartiteTopologyAPI.futures.{BroadcastValueResponse, PromiseResponse, Response}
 import mlAPI.math.DenseVector
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.ParameterDescriptor
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.protocols.periodic.asynchronous.AsynchronousStatistics
 import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 
 /**
@@ -15,6 +16,8 @@ import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Querier] with PullPush {
 
   println("Asynchronous Hub initialized.")
+
+  protocolStatistics = AsynchronousStatistics()
 
   /** A helping counter. */
   var warmupCounter: Int = 0
@@ -42,9 +45,7 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
    * @return An array of [[AsynchronousParameterServer]] instances.
    */
   @MergeOp
-  def merge(parameterServers: Array[AsynchronousParameterServer]): AsynchronousParameterServer = {
-    this
-  }
+  def merge(parameterServers: Array[AsynchronousParameterServer]): AsynchronousParameterServer = this
 
   /** This method responds to a query for the Parameter Server. Right know this is an empty method.
    *
@@ -53,8 +54,7 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
    * @param predicates  Any predicate that is necessary for the calculation of the query.
    */
   @QueryOp
-  def query(queryId: Long, queryTarget: Int, predicates: Array[java.io.Serializable]): Unit = {
-  }
+  def query(queryId: Long, queryTarget: Int, predicates: Array[java.io.Serializable]): Unit = ()
 
   /** Pulling the global model.
    *
@@ -62,15 +62,15 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
    * */
   override def pullModel: Response[ParameterDescriptor] = {
     assert(getCurrentCaller != 0)
-    makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
+    protocolStatistics.updateNumOfBlocks()
     warmupCounter += 1
+    makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
     if (globalModel == null)
       Response.noResponse()
     else if (warmupCounter == parallelism) {
       warmupCounter = 0
       warmedUp = true
-      incrementNumberOfShippedModels(parallelism)
-      fulfillBroadcastPromise(sendModel().getValue)
+      broadcastModel()
     } else
       Response.noResponse()
   }
@@ -82,17 +82,20 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
    * */
   override def pushModel(modelDescriptor: ParameterDescriptor): Response[ParameterDescriptor] = {
     updateGlobalState(modelDescriptor)
+    protocolStatistics.updateNumOfBlocks()
+    protocolStatistics.updateModelsShipped()
+    protocolStatistics.updateBytesShipped(modelDescriptor.getSize)
     if (warmedUp) {
-      incrementNumberOfShippedModels()
-      sendModel()
+      val response = sendModel()
+      protocolStatistics.updateModelsShipped()
+      protocolStatistics.updateBytesShipped(response.getValue.getSize)
+      response
     } else if (warmupCounter == parallelism) {
       warmedUp = true
       warmupCounter = 0
-      incrementNumberOfShippedModels(parallelism)
-      fulfillBroadcastPromise(sendModel().getValue)
-    } else {
+      broadcastModel()
+    } else
       Response.noResponse()
-    }
   }
 
   /** An asynchronous update of the global model.
@@ -102,8 +105,6 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
   def updateGlobalState(remoteModelDescriptor: ParameterDescriptor): Unit = {
     val remoteVector: BreezeDenseVector[Double] = deserializeVector(remoteModelDescriptor)
     incrementNumberOfFittedData(remoteModelDescriptor.getFitted)
-    incrementNumberOfReceivedModels()
-//    printStatistics()
     try {
       globalModel += (remoteVector * (1.0 / (1.0 * getNumberOfSpokes)))
     } catch {
@@ -114,6 +115,13 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
         makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
         warmupCounter += 1
     }
+  }
+
+  def broadcastModel(): BroadcastValueResponse[ParameterDescriptor] = {
+    val packagedModel: ParameterDescriptor = sendModel().getValue
+    protocolStatistics.updateModelsShipped(parallelism)
+    protocolStatistics.updateBytesShipped(parallelism * packagedModel.getSize)
+    fulfillBroadcastPromise(packagedModel)
   }
 
   /** A marshalled model response.

@@ -1,5 +1,6 @@
 package mlAPI.learners.classification.trees.serializable.stats
 
+import ControlAPI.CountableSerial
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 
@@ -8,7 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
  */
 class DiscreteAttributeDescriptor(var attributes: Array[Int],
                                   var counters: Array[ValuesDescriptor])
-  extends java.io.Serializable {
+  extends CountableSerial{
 
   def setAttributes(attributes: Array[Int]): Unit = this.attributes = attributes
 
@@ -28,6 +29,11 @@ class DiscreteAttributeDescriptor(var attributes: Array[Int],
 
   def toJsonString: String = {
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
+  }
+
+  override def getSize: Int = {
+    { if (attributes != null) 4 * attributes.length else 0 } +
+      { if (counters != null) (for (counter <- counters) yield counter.getSize).sum else 0 }
   }
 
 }

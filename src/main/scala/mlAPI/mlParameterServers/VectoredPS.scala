@@ -1,7 +1,7 @@
 package mlAPI.mlParameterServers
 
-import breeze.linalg.{DenseVector => BreezeDenseVector}
-import mlAPI.math.DenseVector
+import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+import mlAPI.math.{DenseVector, SparseVector}
 import mlAPI.parameters.ParameterDescriptor
 
 /**
@@ -14,8 +14,13 @@ abstract class VectoredPS[WorkerIfc, QueryIfc] extends MLParameterServer[WorkerI
 
   var globalModel: BreezeDenseVector[Double] = _
 
-  def deserializeVector(remoteModelDescriptor: ParameterDescriptor): BreezeDenseVector[Double] =
-    BreezeDenseVector(remoteModelDescriptor.getParams.asInstanceOf[DenseVector].data)
+  def deserializeVector(remoteModelDescriptor: ParameterDescriptor): BreezeDenseVector[Double] = {
+    remoteModelDescriptor.getParams match {
+      case dense: DenseVector => BreezeDenseVector(dense.data)
+      case sparse: SparseVector => BreezeDenseVector(sparse.toDenseVector.data)
+      case _: Throwable => throw new RuntimeException("Unknown Vector model.")
+    }
+  }
 
   def assertWarmup(modelDescriptor: ParameterDescriptor): Unit =
     assert(getCurrentCaller == 0 && modelDescriptor.getFitted > 0 && globalModel == null)

@@ -3,6 +3,7 @@ package mlAPI.parameters
 import scala.collection.mutable
 
 trait WithParams {
+
   def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): WithParams
 
   def addHyperParameter(key: String, value: AnyRef): WithParams
@@ -14,4 +15,7 @@ trait WithParams {
   def addParameter(key: String, value: AnyRef): WithParams
 
   def removeParameter(key: String, value: AnyRef): WithParams
+
+  def setStructureFromMap(structureMap: mutable.Map[String, AnyRef]): WithParams
+
 }

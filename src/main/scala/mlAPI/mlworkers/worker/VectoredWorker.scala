@@ -1,7 +1,7 @@
 package mlAPI.mlworkers.worker
 
 import mlAPI.math.Vector
-import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, VectoredParameters}
+import mlAPI.parameters.{Bucket, LearningParameters, ParameterDescriptor, SerializedVectoredParameters, VectoredParameters}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -39,11 +39,10 @@ abstract class VectoredWorker[ProxyIfc, QueryIfc]() extends MLWorker[ProxyIfc, Q
    * @return The delta parameters.
    */
   def getDeltaVector: LearningParameters = {
-    try {
-      getLearnerParams.get.asInstanceOf[VectoredParameters] - getGlobalModel.asInstanceOf[VectoredParameters]
-    } catch {
-      case _: Throwable => getLearnerParams.get
-    }
+    if (globalModel.getFittedData == 0)
+      getMLPipelineParams.get.asInstanceOf[VectoredParameters]
+    else
+      getMLPipelineParams.get.asInstanceOf[VectoredParameters] - getGlobalParams.get.asInstanceOf[VectoredParameters]
   }
 
   /** This method creates the bucket for the splitting of the model. */
@@ -74,21 +73,22 @@ abstract class VectoredWorker[ProxyIfc, QueryIfc]() extends MLWorker[ProxyIfc, Q
   /** Converts the model into a Serializable POJO case class to be send over the Network. */
   override def ModelMarshalling(sparse: Boolean = false, drift: Boolean = true): Array[ParameterDescriptor] = {
     try {
-      val model = if (drift) getDeltaVector else getLearnerParams.get
-      val marshaledModel = {
-        (for (bucket <- quantiles) yield {
-          val (sizes, parameters) = {
-            model.generateSerializedParams(model, Array(sparse, bucket)).asInstanceOf[(Array[Int], Vector)]
-          }
-          ParameterDescriptor(sizes, parameters, bucket, null, null, processedData)
-        }).toArray
-      }
-      marshaledModel
+      split(sparse, if (drift) getDeltaVector else getMLPipelineParams.get)
     } catch {
       case _: NullPointerException =>
         generateQuantiles()
-        ModelMarshalling(sparse, drift)
+        split(sparse, if (drift) getDeltaVector else getMLPipelineParams.get)
     }
+  }
+
+  def split(sparse: Boolean = false, params: LearningParameters): Array[ParameterDescriptor] = {
+    (for (bucket <- quantiles) yield {
+      val (sizes, parameters) = {
+        val sp = params.generateSerializedParams(params, Array(sparse, bucket)).asInstanceOf[SerializedVectoredParameters]
+        (sp.sizes, sp.data)
+      }
+      ParameterDescriptor(sizes, parameters, bucket, null, null, processedData)
+    }).toArray
   }
 
 }

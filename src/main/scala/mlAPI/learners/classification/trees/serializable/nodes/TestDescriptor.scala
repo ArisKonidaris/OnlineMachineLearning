@@ -1,12 +1,13 @@
 package mlAPI.learners.classification.trees.serializable.nodes
 
+import ControlAPI.CountableSerial
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 
 /**
  * A serializable descriptor of an attribute test.
  */
-class TestDescriptor(var id: Int, var value: Double) extends java.io.Serializable {
+class TestDescriptor(var id: Int, var value: Double) extends CountableSerial {
 
   def setId(id: Int): Unit = this.id = id
 
@@ -27,5 +28,7 @@ class TestDescriptor(var id: Int, var value: Double) extends java.io.Serializabl
   def toJsonString: String = {
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
   }
+
+  override def getSize: Int = 12
 
 }

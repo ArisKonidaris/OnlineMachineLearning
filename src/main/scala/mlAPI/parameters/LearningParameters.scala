@@ -1,5 +1,7 @@
 package mlAPI.parameters
 
+import ControlAPI.CountableSerial
+
 /**
  * The base trait representing the learning hyper parameters of a machine learning algorithm.
  */
@@ -16,15 +18,14 @@ trait LearningParameters extends Serializable {
 
   def setBytes(bytes: Int): Unit = this.bytes = bytes
 
-  def equals(obj: Any): Boolean
-
   def toString: String
 
   def getCopy: LearningParameters
 
-  def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable
+  def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters
 
   def generateParameters(pDesc: ParameterDescriptor): LearningParameters
 
+  def sliceRequirements(range: Bucket): Unit = require(range.getEnd <= getSize - 1)
 
 }

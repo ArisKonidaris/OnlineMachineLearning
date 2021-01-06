@@ -1,8 +1,8 @@
 package mlAPI.protocols.fgm
 
-import mlAPI.utils.Sizable
+import ControlAPI.CountableSerial
 
-case class Increment(var increment: Long, var subRound: Long) extends java.io.Serializable with Sizable {
+case class Increment(var increment: Long, var subRound: Long) extends java.io.Serializable with CountableSerial {
 
   def setIncrement(increment: Long): Unit = this.increment = increment
 
@@ -12,7 +12,6 @@ case class Increment(var increment: Long, var subRound: Long) extends java.io.Se
 
   def getSubRound: Long = subRound
 
-  /** Should return the size of the object that extends this trait in Bytes. */
   override def getSize: Int = 16
 
 }

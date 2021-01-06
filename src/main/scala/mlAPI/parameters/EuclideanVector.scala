@@ -26,13 +26,6 @@ case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends Breeze
 
   override def getSizes: Array[Int] = Array(vector.size)
 
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case EuclideanVector(v) => vector.equals(v)
-      case _ => false
-    }
-  }
-
   override def toString: String = s"EuclideanVector($vector)"
 
   override def +(num: Double): LearningParameters = EuclideanVector(vector + num)
@@ -91,17 +84,20 @@ case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends Breeze
 
   override def /=(num: Double): LearningParameters = this *= (1.0 / num)
 
-  override def getCopy: LearningParameters = this.copy()
+  override def getCopy: LearningParameters = {
+    val v = vector.copy
+    EuclideanVector(v)
+  }
 
   override def flatten: BreezeDenseVector[Double] = vector
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
     (lPar: LearningParameters, par: Array[_]) =>
       try {
         assert(par.length == 2 && lPar.isInstanceOf[EuclideanVector])
         val sparse: Boolean = par.head.asInstanceOf[Boolean]
         val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        (
+        new SerializedVectoredParameters(
           Array(lPar.asInstanceOf[EuclideanVector].vector.length),
           lPar.asInstanceOf[EuclideanVector].slice(bucket, sparse)
         )
@@ -113,12 +109,16 @@ case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends Breeze
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
     require(pDesc.getParamSizes.length == 1)
-    require(pDesc.getParams.isInstanceOf[EuclideanVector])
-
-    val weightArrays: ListBuffer[Array[Double]] =
-      unwrapData(pDesc.getParamSizes, pDesc.getParams.asInstanceOf[DenseVector].data)
+    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
     assert(weightArrays.size == 1)
-
     EuclideanVector(BreezeDenseVector[Double](weightArrays.head))
   }
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case EuclideanVector(v) => vector.equals(v)
+      case _ => false
+    }
+  }
+
 }

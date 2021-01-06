@@ -1,8 +1,8 @@
 package mlAPI.protocols.fgm
 
-import mlAPI.utils.Sizable
+import ControlAPI.CountableSerial
 
-case class ZetaValue(var zeta: Double) extends ValueContainer[Double] with Sizable {
+case class ZetaValue(var zeta: Double) extends ValueContainer[Double] with CountableSerial {
 
   def this() = this(0.0)
 
@@ -10,6 +10,5 @@ case class ZetaValue(var zeta: Double) extends ValueContainer[Double] with Sizab
 
   override def setValue(value: Double): Unit = this.zeta = zeta
 
-  /** Should return the size of the object that extends this trait in Bytes. */
   override def getSize: Int = 8
 }

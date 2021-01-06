@@ -1,8 +1,9 @@
 package mlAPI.parameters
 
+import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, SparseVector, Vector}
-
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+
 import scala.collection.mutable.ListBuffer
 
 /** This class wraps a list of vectors.
@@ -203,18 +204,23 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
 
   def /=(index: Int, num: Double): LearningParameters = this *= (index, 1.0 / num)
 
-  override def getCopy: LearningParameters = this.copy()
+  override def getCopy: LearningParameters = {
+    val newVectors: ListBuffer[EuclideanVector] = ListBuffer[EuclideanVector]()
+    for (vector <- vectors)
+      newVectors += vector.getCopy.asInstanceOf[EuclideanVector]
+    VectorList(newVectors)
+  }
 
   override def flatten: BreezeDenseVector[Double] =
     (for (vector: EuclideanVector <- vectors) yield vector.flatten).reduce((x, y) => BreezeDenseVector.vertcat(x, y))
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
     (lPar: LearningParameters, par: Array[_]) =>
       try {
         assert(par.length == 2 && lPar.isInstanceOf[VectorList])
         val sparse: Boolean = par.head.asInstanceOf[Boolean]
         val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        (
+        new SerializedVectoredParameters(
           (for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray,
           lPar.asInstanceOf[VectorList].slice(bucket, sparse)
         )
@@ -224,12 +230,7 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
       }
   }
 
-  override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParams.isInstanceOf[DenseVector])
+  override def generateParameters(pDesc: ParameterDescriptor): LearningParameters =
+    new VectorList(unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data).toArray)
 
-    val weightArrays: ListBuffer[Array[Double]] =
-      unwrapData(pDesc.getParamSizes, pDesc.getParams.asInstanceOf[DenseVector].data)
-
-    new VectorList(weightArrays.toArray)
-  }
 }

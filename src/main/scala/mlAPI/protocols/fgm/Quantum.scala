@@ -1,8 +1,8 @@
 package mlAPI.protocols.fgm
 
-import mlAPI.utils.Sizable
+import ControlAPI.CountableSerial
 
-case class Quantum(var quantum: Double) extends ValueContainer[Double] with Sizable {
+case class Quantum(var quantum: Double) extends ValueContainer[Double] with CountableSerial {
 
   require(quantum >= 0.0)
 
@@ -14,6 +14,6 @@ case class Quantum(var quantum: Double) extends ValueContainer[Double] with Siza
     if (quantum >= 0.0) this.quantum = quantum
   }
 
-  /** Should return the size of the object that extends this trait in Bytes. */
   override def getSize: Int = 8
+
 }

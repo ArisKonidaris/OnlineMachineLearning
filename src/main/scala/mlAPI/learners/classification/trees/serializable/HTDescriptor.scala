@@ -3,6 +3,7 @@ package mlAPI.learners.classification.trees.serializable
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import mlAPI.learners.classification.trees.serializable.nodes.NodeDescriptor
+import mlAPI.parameters.SerializedParameters
 
 /**
  * A serializable descriptor of a Hoeffding Tree.
@@ -19,7 +20,7 @@ case class HTDescriptor(var discrete: Boolean,
                         var targets: Array[Int],
                         var range: Double,
                         var maxLabel: Int,
-                        var size: Int,
+                        var treeSize: Int,
                         var tree: NodeDescriptor,
                         var height: Int,
                         var numberOfInternalNodes: Int,
@@ -30,7 +31,7 @@ case class HTDescriptor(var discrete: Boolean,
                         var leafCounter: Int,
                         var activeSize: Int,
                         var inactiveSize: Int)
-  extends java.io.Serializable {
+  extends SerializedParameters {
 
   def setDiscrete(discrete: Boolean): Unit = this.discrete = discrete
 
@@ -80,9 +81,9 @@ case class HTDescriptor(var discrete: Boolean,
 
   def getMaxLabel: Int = maxLabel
 
-  def setSize(size: Int): Unit = this.size = size
+  def setTreeSize(size: Int): Unit = this.treeSize = size
 
-  def getSize: Int = size
+  def getTreeSize: Int = treeSize
 
   def setTree(tree: NodeDescriptor): Unit = this.tree = tree
 
@@ -134,6 +135,13 @@ case class HTDescriptor(var discrete: Boolean,
 
   def toJsonString: String = {
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
+  }
+
+  override def getSize: Int = {
+    101 +
+      { if (classes != null) 8 * classes.length else 0 } +
+      { if (targets != null) 4 * targets.length else 0 } +
+      tree.getSize
   }
 
 }

@@ -5,7 +5,7 @@ import mlAPI.dataBuffers.removeStrategy.{RandomRemoveStrategy, RemoveOldestStrat
 
 import scala.collection.mutable.ListBuffer
 
-case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
+case class DataSet[T](var dataBuffer: ListBuffer[T], var max_size: Int)
   extends DataBuffer[T] {
 
   def this() = this(ListBuffer[T](), 500000)
@@ -20,29 +20,29 @@ case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
   /** This is the removal strategy of data from the buffer when merging two data buffers. */
   var merging_remove_strategy: RemoveStrategy[T] = RandomRemoveStrategy[T]()
 
-  override def isEmpty: Boolean = data_buffer.isEmpty
+  override def isEmpty: Boolean = dataBuffer.isEmpty
 
   override def append(data: T): Option[T] = {
-    data_buffer += data
+    dataBuffer += data
     overflowCheck()
   }
 
   override def insert(index: Int, data: T): Option[T] = {
-    data_buffer.insert(index, data)
+    dataBuffer.insert(index, data)
     overflowCheck()
   }
 
-  override def length: Int = data_buffer.length
+  override def length: Int = dataBuffer.length
 
   override def clear(): Unit = {
-    data_buffer.clear()
+    dataBuffer.clear()
     max_size = 500000
   }
 
   override def pop: Option[T] = remove(0)
 
   override def remove(index: Int): Option[T] = {
-    if (data_buffer.length > index) Some(data_buffer.remove(index)) else None
+    if (dataBuffer.length > index) Some(dataBuffer.remove(index)) else None
   }
 
   override def merge(mergeables: Array[Mergeable]): Unit = {
@@ -51,12 +51,12 @@ case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
     for (buffer: DataSet[T] <- mergeables.asInstanceOf[Array[DataSet[T]]]) {
       if (buffer.nonEmpty) {
         if (isEmpty) {
-          data_buffer = buffer.getDataBuffer
+          dataBuffer = buffer.getDataBuffer
         } else {
           merges += 1
-          data_buffer = DatasetUtils.mergeBufferedPoints(1, length,
+          dataBuffer = DatasetUtils.mergeBufferedPoints(1, length,
             0, buffer.length,
-            data_buffer, buffer.getDataBuffer,
+            dataBuffer, buffer.getDataBuffer,
             merges)
         }
       }
@@ -64,7 +64,7 @@ case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
   }
 
   def overflowCheck(): Option[T] = {
-    if (data_buffer.length > max_size)
+    if (dataBuffer.length > max_size)
       Some(remove_strategy.removeTuple(this).get)
     else
       None
@@ -76,7 +76,7 @@ case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
 
   /////////////////////////////////////////// Getters ////////////////////////////////////////////////
 
-  def getDataBuffer: ListBuffer[T] = data_buffer
+  def getDataBuffer: ListBuffer[T] = dataBuffer
 
   def getMaxSize: Int = max_size
 
@@ -86,7 +86,7 @@ case class DataSet[T](var data_buffer: ListBuffer[T], var max_size: Int)
 
   /////////////////////////////////////////// Setters ////////////////////////////////////////////////
 
-  def setDataBuffer(data_set: ListBuffer[T]): Unit = this.data_buffer = data_set
+  def setDataBuffer(data_set: ListBuffer[T]): Unit = this.dataBuffer = data_set
 
   def setMaxSize(max_size: Int): Unit = this.max_size = max_size
 

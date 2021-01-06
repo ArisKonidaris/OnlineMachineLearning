@@ -40,4 +40,6 @@ case class InternalNodeDescriptor(var leftChild: NodeDescriptor,
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
   }
 
+  override def getSize: Int = leftChild.getSize + rightChild.getSize + test.getSize + 4
+
 }

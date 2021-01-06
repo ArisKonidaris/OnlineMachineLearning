@@ -6,7 +6,10 @@ trait Classifier extends Learner {
 
   protected var targetLabel: Double
 
-  def setTargetLabel(targetLabel: Double): Unit = this.targetLabel = targetLabel
+  def setTargetLabel(targetLabel: Double): Learner = {
+    this.targetLabel = targetLabel
+    this
+  }
 
   def getTargetLabel: Double = {
     val value: Double = targetLabel

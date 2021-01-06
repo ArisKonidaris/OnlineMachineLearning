@@ -1,23 +1,37 @@
 package mlAPI.learners.classification
 
 import ControlAPI.LearnerPOJO
+import com.fasterxml.jackson.databind.ObjectMapper
 import mlAPI.learners.classification.trees.HoeffdingTree
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.classification.trees.serializable.HTDescriptor
+import mlAPI.learners.Learner
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.parameters.{HTParameters, LearningParameters, ParameterDescriptor}
+import mlAPI.parameters.{HTParameters, LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters}
 import mlAPI.scores.Scores
+import mlAPI.utils.Parsing
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-case class HoeffdingTreeClassifier(override protected var targetLabel: Double = 1.0)
-  extends OnlineLearner with Classifier with Serializable {
+/**
+ * A Hoeffding tree classifier.
+ */
+case class HoeffdingTreeClassifier() extends Classifier with Serializable {
 
+  override protected var targetLabel: Double = 1.0
+  override protected var miniBatchSize: Int = 1
+  override protected val parallelizable: Boolean = false
   var tree: HTParameters = HTParameters(new HoeffdingTree())
 
-  override protected val parallelizable: Boolean = false
-
   override def predict(data: Point): Option[Double] = Some(tree.ht.predict(data.asUnlabeledPoint)._1)
+
+  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+    val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
+    for (point <- batch)
+      predictions append predict(point)
+    predictions.toArray
+  }
 
   override def fit(data: Point): Unit = {
     data match {
@@ -35,6 +49,13 @@ case class HoeffdingTreeClassifier(override protected var targetLabel: Double = 
     }
   }
 
+  override def fit(batch: ListBuffer[Point]): Unit = {
+    fitLoss(batch)
+    ()
+  }
+
+  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
@@ -46,9 +67,107 @@ case class HoeffdingTreeClassifier(override protected var targetLabel: Double = 
     this
   }
 
+  override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
+    for ((hyperparameter, value) <- hyperParameterMap) {
+      hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "discrete" =>
+          try {
+            tree.ht.setDiscrete(value.asInstanceOf[Boolean])
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the discrete hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "maxByteSize" =>
+          try {
+            tree.ht.setMaxByteSize(Parsing.IntegerParsing(hyperParameterMap, "maxByteSize", 33554432))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the maxByteSize hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "n_min" =>
+          try {
+            tree.ht.setNMin(Parsing.DoubleParsing(hyperParameterMap, "n_min", 200).toLong)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the n_min hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "tau" =>
+          try {
+            tree.ht.setTau(Parsing.DoubleParsing(hyperParameterMap, "tau", 0.05))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the tau hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "delta" =>
+          try {
+            tree.ht.setDelta(Parsing.DoubleParsing(hyperParameterMap, "delta", 1.0E-7D))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the delta hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "num_of_classes" =>
+          try {
+            tree.ht.setNumOfClasses(Parsing.DoubleParsing(hyperParameterMap, "num_of_classes", 2))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the num_of_classes hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "splits" =>
+          try {
+            tree.ht.setSplits(Parsing.IntegerParsing(hyperParameterMap, "splits", 10))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the splits hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case "mem_period" =>
+          try {
+            tree.ht.setMemPeriod(Parsing.IntegerParsing(hyperParameterMap, "mem_period", 100000))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the mem_period hyper parameter of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case _ =>
+      }
+    }
+    this
+  }
+
+  override def setStructureFromMap(structureMap: mutable.Map[String, AnyRef]): Learner = {
+    for ((parameter, value) <- structureMap) {
+      parameter match {
+        case "serializedHT" =>
+          try {
+            tree.ht.deserialize(new ObjectMapper().readValue(value.asInstanceOf[String], classOf[HTDescriptor]))
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the structure of the Hoeffding Tree classifier.")
+              e.printStackTrace()
+          }
+        case _ =>
+      }
+    }
+    this
+  }
+
   override def generateParameters: ParameterDescriptor => LearningParameters = new HTParameters().generateParameters
 
-  override def getSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable =
+  override def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters =
     tree.generateSerializedParams
 
   override def generatePOJOLearner: LearnerPOJO = {
@@ -58,6 +177,7 @@ case class HoeffdingTreeClassifier(override protected var targetLabel: Double = 
       Map[String, AnyRef](("serializedHT",tree.ht.serialize)).asJava
     )
   }
+
 }
 
 object HoeffdingTreeClassifier {

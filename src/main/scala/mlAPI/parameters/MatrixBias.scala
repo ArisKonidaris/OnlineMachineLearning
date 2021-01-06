@@ -1,8 +1,7 @@
 package mlAPI.parameters
 
-import mlAPI.math.DenseVector
-
 import breeze.linalg.{DenseMatrix => BreezeDenseMatrix, DenseVector => BreezeDenseVector}
+
 import scala.collection.mutable.ListBuffer
 
 /** This class represents a weight matrix with an intercept (bias) vector.
@@ -21,13 +20,6 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
   def this(weights: Array[Double]) = this()
 
   override def getSizes: Array[Int] = Array(A.size, b.size)
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case MatrixBias(w, i) => b == i && A.equals(w)
-      case _ => false
-    }
-  }
 
   override def toString: String = s"MatrixBias([${A.rows}x${A.cols}], ${A.toDenseVector}, $b)"
 
@@ -90,17 +82,21 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
 
   override def /=(num: Double): LearningParameters = this *= (1.0 / num)
 
-  override def getCopy: LearningParameters = this.copy()
+  override def getCopy: LearningParameters = {
+    val A_ = A.copy
+    val b_ = b.copy
+    MatrixBias(A_, b_)
+  }
 
   override def flatten: BreezeDenseVector[Double] = BreezeDenseVector.vertcat(A.toDenseVector, b)
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
     (lPar: LearningParameters, par: Array[_]) =>
       try {
         assert(par.length == 2 && lPar.isInstanceOf[MatrixBias])
         val sparse: Boolean = par.head.asInstanceOf[Boolean]
         val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        (
+        new SerializedVectoredParameters(
           Array(lPar.asInstanceOf[MatrixBias].A.size, lPar.asInstanceOf[MatrixBias].b.size),
           lPar.asInstanceOf[MatrixBias].slice(bucket, sparse)
         )
@@ -111,14 +107,18 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParamSizes.length == 2 && pDesc.getParams.isInstanceOf[DenseVector])
-
-    val weightArrays: ListBuffer[Array[Double]] =
-      unwrapData(pDesc.getParamSizes, pDesc.getParams.asInstanceOf[DenseVector].data)
+    require(pDesc.getParamSizes.length == 2)
+    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
     assert(weightArrays.size == 2)
-
     MatrixBias(BreezeDenseVector[Double](weightArrays.head).toDenseMatrix,
       BreezeDenseVector[Double](weightArrays.tail.head))
+  }
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case MatrixBias(w, i) => b == i && A.equals(w)
+      case _ => false
+    }
   }
 
 }

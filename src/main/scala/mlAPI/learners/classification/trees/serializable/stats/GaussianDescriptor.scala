@@ -1,12 +1,13 @@
 package mlAPI.learners.classification.trees.serializable.stats
 
+import ControlAPI.CountableSerial
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 
 /**
  * A serializable descriptor of a gaussian distribution.
  */
-class GaussianDescriptor(var mean: Double, var d_squared: Double, var count: Long) extends java.io.Serializable {
+class GaussianDescriptor(var mean: Double, var d_squared: Double, var count: Long) extends CountableSerial {
 
   def setMean(mean: Double): Unit = this.mean = mean
 
@@ -31,5 +32,7 @@ class GaussianDescriptor(var mean: Double, var d_squared: Double, var count: Lon
   def toJsonString: String = {
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
   }
+
+  override def getSize: Int = 24
 
 }

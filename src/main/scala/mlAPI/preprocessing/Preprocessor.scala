@@ -33,4 +33,6 @@ trait Preprocessor extends Serializable with WithParams {
 
   override def removeParameter(key: String, value: AnyRef): Preprocessor = this
 
+  def setStructureFromMap(structureMap: mutable.Map[String, AnyRef]): Preprocessor = this
+
 }

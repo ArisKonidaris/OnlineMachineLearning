@@ -6,7 +6,7 @@ import mlAPI.parameters.ParameterDescriptor
 @RemoteProxy
 trait RemoteLearner {
 
-  @RemoteOp
-  def updateModel(model: ParameterDescriptor): Unit
+//  @RemoteOp
+//  def updateModel(model: ParameterDescriptor): Unit
 
 }

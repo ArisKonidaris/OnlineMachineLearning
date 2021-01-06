@@ -1,5 +1,6 @@
 package mlAPI.learners.classification.trees.serializable.stats
 
+import ControlAPI.CountableSerial
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 
@@ -16,7 +17,15 @@ class NumericalStatisticsDescriptor(classCountersKeys: Array[Int],
                                     var dropped: Array[Int],
                                     var splits: Int)
   extends StatisticsDescriptor(classCountersKeys, classCountersValues, max, prediction, n_l, isActive)
-    with java.io.Serializable {
+    with CountableSerial {
+
+  override def getSize: Int = {
+    25 +
+      { if (classCountersKeys != null) 4 * classCountersKeys.length else 0 } +
+      { if (classCountersValues != null) 8 * classCountersValues.length else 0 } +
+      { if (attributeNormalsDescriptor != null) (for (and <- attributeNormalsDescriptor) yield and.getSize).sum else 0 }
+      { if (dropped != null) 4 * dropped.length else 0 }
+  }
 
   def setAttributeNormalsDescriptor(attributeNormalsDescriptor: Array[AttributeGaussianDescriptor]): Unit =
     this.attributeNormalsDescriptor = attributeNormalsDescriptor

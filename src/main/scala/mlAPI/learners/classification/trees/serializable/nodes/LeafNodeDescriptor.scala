@@ -11,7 +11,7 @@ case class LeafNodeDescriptor(var id: Int,
                               var isLeft: Boolean,
                               var stats: StatisticsDescriptor,
                               var height: Int)
-  extends NodeDescriptor with java.io.Serializable {
+  extends NodeDescriptor {
 
   def setId(id: Int): Unit = this.id = id
 
@@ -40,5 +40,7 @@ case class LeafNodeDescriptor(var id: Int,
   def toJsonString: String = {
     new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(this)
   }
+
+  override def getSize: Int = 9 + stats.getSize
 
 }

@@ -2,29 +2,32 @@ package mlAPI.learners.classification
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.learners.{Learner, OnlineLearner}
+import mlAPI.learners.Learner
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, VectorBias}
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorBias}
 import mlAPI.scores.Scores
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.utils.Parsing
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-case class SVM(override protected var targetLabel: Double = 1.0)
-  extends OnlineLearner with Classifier with Serializable {
+/**
+ * Support Vector Machine classifier.
+ */
+case class SVM() extends Classifier with Serializable {
 
+  override protected var targetLabel: Double = 1.0
+  override protected var miniBatchSize: Int = 1
   override protected val parallelizable: Boolean = true
-
   protected var C: Double = 0.01
-
   protected var weights: VectorBias = _
-
   protected var count: Long = 0L
 
-  override def initialize_model(data: Point): Unit = {
+  override def initializeModel(data: Point): Learner = {
     weights = VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
+    this
   }
 
   def predictWithMargin(data: Point): Option[Double] = {
@@ -42,6 +45,13 @@ case class SVM(override protected var targetLabel: Double = 1.0)
     }
   }
 
+  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+    val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
+    for (point <- batch)
+      predictions append predict(point)
+    predictions.toArray
+  }
+
   override def fit(data: Point): Unit = {
     if (count < Long.MaxValue) fitLoss(data)
     ()
@@ -57,7 +67,7 @@ case class SVM(override protected var targetLabel: Double = 1.0)
           val sign: Double = if (label * prediction < 1.0) 1.0 else 0.0
           val loss: Double = Math.max(0.0, 1.0 - label * prediction)
 
-          val direction = VectorBias(weights.weights - C * label * sign * data.getNumericVector.asBreeze, - label * sign)
+          val direction = VectorBias(weights.weights - C * label * sign * data.getNumericVector.asBreeze, -label * sign)
 
           count += 1
           weights -= (direction / count)
@@ -69,6 +79,13 @@ case class SVM(override protected var targetLabel: Double = 1.0)
       }
   }
 
+  override def fit(batch: ListBuffer[Point]): Unit = {
+    fitLoss(batch)
+    ()
+  }
+
+  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
@@ -76,9 +93,9 @@ case class SVM(override protected var targetLabel: Double = 1.0)
 
   private def checkParameters(data: Point): Unit = {
     if (weights == null) {
-      initialize_model(data)
+      initializeModel(data)
     } else {
-      if(weights.weights.size != data.getNumericVector.size)
+      if (weights.weights.size != data.getNumericVector.size)
         throw new RuntimeException("Incompatible model and data point size.")
       else
         throw new RuntimeException("Something went wrong while fitting the data point " +
@@ -130,6 +147,14 @@ case class SVM(override protected var targetLabel: Double = 1.0)
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the SVM classifier.")
+              e.printStackTrace()
+          }
         case "C" =>
           try {
             setC(value.asInstanceOf[Double])
@@ -156,15 +181,15 @@ case class SVM(override protected var targetLabel: Double = 1.0)
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
+  override def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters =
     new VectorBias().generateSerializedParams
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("SVM",
       Map[String, AnyRef](("C", C.asInstanceOf[AnyRef])).asJava,
       Map[String, AnyRef](
-        ("a", if(weights == null) null else weights.weights.data.asInstanceOf[AnyRef]),
-        ("b", if(weights == null) null else weights.intercept.asInstanceOf[AnyRef])
+        ("a", if (weights == null) null else weights.weights.data.asInstanceOf[AnyRef]),
+        ("b", if (weights == null) null else weights.intercept.asInstanceOf[AnyRef])
       ).asJava,
       null
     )

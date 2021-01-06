@@ -3,54 +3,54 @@ package mlAPI.math
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector, Vector => BreezeVector}
 
 /** Base trait for Vectors
-  *
-  */
+ *
+ */
 trait Vector extends Serializable {
 
   /** Number of elements request a vector
-    *
-    * @return The number of elements of the vector
-    */
+   *
+   * @return The number of elements of the vector
+   */
   def size: Int
 
   /** Element wise access function
-    *
-    * @param index index of the accessed element
-    * @return value of the associated with the index
-    */
+   *
+   * @param index index of the accessed element
+   * @return value of the associated with the index
+   */
   def apply(index: Int): Double
 
   /** Updates the element at the given index with the provided value
-    *
-    * @param index The index of the element to be updated
-    * @param value The new value
-    */
+   *
+   * @param index The index of the element to be updated
+   * @param value The new value
+   */
   def update(index: Int, value: Double): Unit
 
   /** Copies the vector instance
-    *
-    * @return Copy of the vector instance
-    */
+   *
+   * @return Copy of the vector instance
+   */
   def copy: Vector
 
   /** Returns the dot product of the recipient and the argument
-    *
-    * @param other a Vector
-    * @return a scalar double of dot product
-    */
+   *
+   * @param other a Vector
+   * @return a scalar double of dot product
+   */
   def dot(other: Vector): Double
 
   /** Returns the outer product of the recipient and the argument
-    *
-    * @param other a Vector
-    * @return a matrix
-    */
+   *
+   * @param other a Vector
+   * @return a matrix
+   */
   def outer(other: Vector): Matrix
 
   /** Magnitude of a vector
-    *
-    * @return The length of the vector
-    */
+   *
+   * @return The length of the vector
+   */
   def magnitude: Double
 
   def equalsVector(vector: Vector): Boolean = {
@@ -63,18 +63,30 @@ trait Vector extends Serializable {
   }
 
   /** Converts the vector to a List of Doubles
-    *
-    * @return A List of Doubles
-    */
+   *
+   * @return A List of Doubles
+   */
   def toList: List[Double]
+
+  /** Converts the vector to an Array of Doubles
+   *
+   * @return An Array of Doubles
+   */
+  def toArray: Array[Double]
+
+  /** Calculates the byte size of the Vector
+   *
+   * @return The size of the VEctor in bytes
+   */
+  def getSize: Int
 
 }
 
 object Vector {
   /** BreezeVectorConverter implementation for [[Vector]]
-    *
-    * This allows to convert Breeze vectors into [[Vector]].
-    */
+   *
+   * This allows to convert Breeze vectors into [[Vector]].
+   */
   implicit val vectorConverter = new BreezeVectorConverter[Vector] {
     override def convert(vector: BreezeVector[Double]): Vector = {
       vector match {

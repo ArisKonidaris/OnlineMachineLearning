@@ -9,7 +9,7 @@ import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.ParameterDescriptor
 import mlAPI.safezones.{SafeZone, VarianceSafeZone}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
-import mlAPI.protocols.fgm.{FGMHubInterface, FGMRemoteLearner, Increment, Quantum, ZetaValue}
+import mlAPI.protocols.fgm.{FGMHubInterface, FGMRemoteLearner, FGMStatistics, Increment, Quantum, ZetaValue}
 import mlAPI.utils.Parsing
 
 import scala.collection.mutable
@@ -23,22 +23,18 @@ import scala.collection.JavaConverters._
  * @param safeZone  The safe zone function of the FGM protocol.
  */
 case class FGMParameterServer(private var precision: Double = 0.01,
-                              private var safeZone: SafeZone = VarianceSafeZone(0.0008))
+                              private var safeZone: SafeZone = VarianceSafeZone())
   extends VectoredPS[FGMRemoteLearner, Querier] with FGMHubInterface {
 
   println("FGM Hub initialized.")
+
+  protocolStatistics = FGMStatistics()
 
   /** A synchronizer variable. */
   var sync: SyncProtocol = new SyncProtocol()
 
   /** The increment of a sub-round. */
   var inc: Long = 0
-
-  /** The number of rounds of the FMG distributed learning protocol. */
-  var numRounds: Long = 0
-
-  /** The number of sub-rounds of the FMG distributed learning protocol. */
-  var numSubRounds: Long = 0
 
   /** Number of safe zones sent by the FGM coordinator. */
   var safeZonesSent: Long = 0
@@ -75,8 +71,8 @@ case class FGMParameterServer(private var precision: Double = 0.01,
     barrier = precision * phi
 
     // Increment the number of rounds, sub-rounds and number of shipped safe zones of the FGM distributed learning protocol.
-    numRounds += 1
-    numSubRounds += 1
+    protocolStatistics.asInstanceOf[FGMStatistics].updateNumOfRounds()
+    protocolStatistics.asInstanceOf[FGMStatistics].updateNumOfSubRounds()
     safeZonesSent += sync.parallelism
   }
 
@@ -86,8 +82,10 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * */
   def startRound(): BroadcastValueResponse[ParameterDescriptor] = {
     prepareNewRound()
-    incrementNumberOfShippedModels(sync.parallelism)
-    fulfillBroadcastPromise(sendModel().getValue)
+    val packagedModel: ParameterDescriptor = sendModel().getValue
+    protocolStatistics.updateModelsShipped(sync.parallelism)
+    protocolStatistics.updateBytesShipped(sync.parallelism * packagedModel.getSize)
+    fulfillBroadcastPromise(packagedModel)
   }
 
   /** Ending the warmup of the FGM distributed learning protocol.
@@ -99,12 +97,14 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * */
   override def endWarmup(modelDescriptor: ParameterDescriptor): Response[ParameterDescriptor] = {
     assertWarmup(modelDescriptor)
+    protocolStatistics.updateModelsShipped()
+    protocolStatistics.updateBytesShipped(modelDescriptor.getSize)
+    protocolStatistics.updateNumOfBlocks()
     parametersDescription = modelDescriptor
     globalModel = deserializeVector(modelDescriptor)
     drift = 0.0 * globalModel
     makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
     sync.shippedDrifts.put(0, modelDescriptor.getFitted)
-    incrementNumberOfReceivedModels()
     if (sync.shippedDrifts.size == sync.parallelism)
       startRound()
     else
@@ -117,6 +117,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * */
   override def pullModel: Response[ParameterDescriptor] = {
     assert(getCurrentCaller != 0)
+    protocolStatistics.updateNumOfBlocks()
     makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
     sync.shippedDrifts.put(getCurrentCaller, 0)
     if (globalModel == null)
@@ -133,7 +134,6 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    */
   def updateDrift(remoteModelDescriptor: ParameterDescriptor): Unit = {
     val remoteVector: BreezeDenseVector[Double] = deserializeVector(remoteModelDescriptor)
-    incrementNumberOfReceivedModels()
     drift += remoteVector
   }
 
@@ -143,6 +143,9 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * @return The new global model.
    * */
   override def receiveLocalDrift(modelDescriptor: ParameterDescriptor): Response[ParameterDescriptor] = {
+    protocolStatistics.updateModelsShipped()
+    protocolStatistics.updateBytesShipped(modelDescriptor.getSize)
+    protocolStatistics.updateNumOfBlocks()
     makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
     sync.shippedDrifts.put(getCurrentCaller, modelDescriptor.getFitted)
     if (modelDescriptor.getFitted > 0)
@@ -159,7 +162,8 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * @param increment The increment send by the worker.
    * */
   override def receiveIncrement(increment: Increment): Unit = {
-    if (sync.activeSubRound && numSubRounds == increment.subRound) {
+    protocolStatistics.updateBytesShipped(increment.getSize)
+    if (sync.activeSubRound && protocolStatistics.asInstanceOf[FGMStatistics].getNumOfSubRounds == increment.subRound) {
       inc += increment.increment
       if (inc > sync.parallelism) {
         sync.activeSubRound = false
@@ -167,14 +171,14 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       }
     }
 //    println(inc)
-//    printStatistics()
   }
 
   /** Receiving the zeta safe zone function value of a worker.
    *
-   * @param zeta The zeta safezone function value sent by the worker.
+   * @param zeta The zeta safe zone function value sent by the worker.
    * */
   override def receiveZeta(zeta: ZetaValue): Unit = {
+    protocolStatistics.updateBytesShipped(zeta.getSize)
     phi += zeta.getValue
     sync.shippedZetas += getCurrentCaller
     if (sync.shippedZetas.length == sync.parallelism) {
@@ -182,14 +186,21 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       inc = 0
       if (phi >= barrier) {
         quantum = phi / (2.0 * sync.parallelism)
-        assert(quantum > 0)
-        getBroadcastProxy.receiveQuantum(Quantum(quantum))
-        numSubRounds += 1
+        newSubRound(quantum)
         sync.activeSubRound = true
       } else
         getBroadcastProxy.sendLocalDrift()
       phi = 0.0
     }
+  }
+
+  /** A method that broadcasts the new quantum to all the workers, thus initiating a new sub-round. */
+  def newSubRound(quantum: Double): Unit = {
+    require(quantum > 0)
+    val q = Quantum(quantum)
+    protocolStatistics.updateBytesShipped(sync.parallelism * q.getSize)
+    protocolStatistics.asInstanceOf[FGMStatistics].updateNumOfSubRounds()
+    getBroadcastProxy.receiveQuantum(q)
   }
 
   /** A marshalled model response.
@@ -201,7 +212,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       parametersDescription.copy(
         params = DenseVector.denseVectorConverter.convert(globalModel),
         fitted = fitted,
-        miscellaneous = Array(quantum)
+        miscellaneous = Quantum(quantum)
       )
     )
   }
@@ -264,10 +275,10 @@ case class FGMParameterServer(private var precision: Double = 0.01,
 
   }
 
-  def configure(request: Request): Unit = {
+  override def configureParameterServer(request: Request): FGMParameterServer = {
 
     // Setting the ML Hub.
-    val config: mutable.Map[String, AnyRef] = request.getTraining_configuration.asScala
+    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
 
     if (config.contains("precision")) {
       try {
@@ -277,14 +288,14 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       }
     }
 
-    if (config.contains("safe_zone")) {
+    if (config.contains("safeZone")) {
       try {
         setSafeZone(
-          config("safe_zone").asInstanceOf[String] match {
+          config("safeZone").asInstanceOf[String] match {
             case "ModelVariance" =>
               if (config.contains("threshold")) {
                 try {
-                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.008))
+                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.0008))
                 } catch {
                   case _: Throwable => VarianceSafeZone()
                 }
@@ -297,6 +308,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       }
     }
 
+    this
   }
 
   //  def checkParallelism(): Unit = {

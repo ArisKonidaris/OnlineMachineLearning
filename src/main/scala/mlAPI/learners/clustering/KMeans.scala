@@ -3,9 +3,10 @@ package mlAPI.learners.clustering
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{DenseVector, Point, UnlabeledPoint}
-import mlAPI.learners.{Learner, OnlineLearner}
-import mlAPI.parameters.{EuclideanVector, LearningParameters, ParameterDescriptor, VectorList}
+import mlAPI.learners.Learner
+import mlAPI.parameters.{EuclideanVector, LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorList}
 import mlAPI.scores.Scores
+import mlAPI.utils.Parsing
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -16,30 +17,24 @@ import scala.util.Random
   * Inspired from
   * http://www.cs.princeton.edu/courses/archive/fall08/cos436/Duda/C/sk_means.htm
   */
-case class KMeans() extends OnlineLearner with Clusterer with Serializable {
+case class KMeans() extends Clusterer with Serializable {
 
+  override protected var miniBatchSize: Int = 1
   override protected val parallelizable: Boolean = false
-
   private var counts: ListBuffer[Long] = _
-
   private var centroids: VectorList = _
-
   private var nClusters: Int = 2
-
   private var initMethod: String = "random"
-
   private var trainingMethod: String = "forgetful"
-
   private var graceInit: Int = 10
-
   private var step: Double = 0.01
-
   private var initFeatures: ListBuffer[Point] = ListBuffer[Point]()
 
-  override def initialize_model(data: Point): Unit = {
+  override def initializeModel(data: Point): Learner = {
     require(data.isInstanceOf[UnlabeledPoint])
     initFeatures.append(data.asInstanceOf[UnlabeledPoint])
     if (initFeatures.size >= graceInit * nClusters) initCentroids()
+    this
   }
 
   override def predict(data: Point): Option[Double] = {
@@ -48,6 +43,13 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
       Some(dist.zipWithIndex.min._2.toDouble)
     else
       None
+  }
+
+  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+    val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
+    for (point <- batch)
+      predictions append predict(point)
+    predictions.toArray
   }
 
   override def fit(data: Point): Unit = {
@@ -69,9 +71,16 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
         } else step * (data.getNumericVector.asDenseBreeze - centroids.vectors(prediction).vector)
       }
       centroids.vectors(prediction).vector += update
-    } else initialize_model(data)
+    } else initializeModel(data)
     loss
   }
+
+  override def fit(batch: ListBuffer[Point]): Unit = {
+    fitLoss(batch)
+    ()
+  }
+
+  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
   override def score(test_set: ListBuffer[Point]): Double = Scores.inertia(test_set, this)
 
@@ -233,6 +242,14 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the K-Mean clusterer.")
+              e.printStackTrace()
+          }
         case "nClusters" =>
           try {
             setNClusters(value.asInstanceOf[Double].toInt)
@@ -283,7 +300,7 @@ case class KMeans() extends OnlineLearner with Clusterer with Serializable {
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorList().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
+  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
     new VectorList().generateSerializedParams
 
   override def generatePOJOLearner: LearnerPOJO = {

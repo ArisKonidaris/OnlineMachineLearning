@@ -1,8 +1,9 @@
 package mlAPI.parameters
 
+import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, SparseVector}
-
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+
 import scala.collection.mutable.ListBuffer
 
 /** This class wraps a list of vectors with biases.
@@ -202,18 +203,23 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
 
   def /=(index: Int, num: Double): LearningParameters = this *= (index, 1.0 / num)
 
-  override def getCopy: LearningParameters = this.copy()
+  override def getCopy: LearningParameters = {
+    val newVectorBiases: ListBuffer[VectorBias] = ListBuffer[VectorBias]()
+    for (vectorBias <- vectorBiases)
+      newVectorBiases += vectorBias.getCopy.asInstanceOf[VectorBias]
+    VectorBiasList(newVectorBiases)
+  }
 
   override def flatten: BreezeDenseVector[Double] =
     (for (weights: VectorBias <- vectorBiases) yield weights.flatten).reduce((x, y) => BreezeDenseVector.vertcat(x, y))
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable = {
+  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
     (lPar: LearningParameters, par : Array[_]) =>
       try {
         assert(par.length == 2 && lPar.isInstanceOf[VectorBiasList])
         val sparse: Boolean = par.head.asInstanceOf[Boolean]
         val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        (
+        new SerializedVectoredParameters(
           (for (weights: VectorBias <- vectorBiases) yield weights.getSizes).flatten.toArray,
           lPar.asInstanceOf[VectorBiasList].slice(bucket, sparse)
         )
@@ -224,11 +230,7 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParams.isInstanceOf[DenseVector])
-
-    val weightArrays: ListBuffer[Array[Double]] =
-      unwrapData(pDesc.getParamSizes, pDesc.getParams.asInstanceOf[DenseVector].data)
-
+    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
     new VectorBiasList((for ((e, i) <- weightArrays.zipWithIndex if i % 2 == 0) yield e ++ weightArrays(i + 1)).toArray)
   }
 

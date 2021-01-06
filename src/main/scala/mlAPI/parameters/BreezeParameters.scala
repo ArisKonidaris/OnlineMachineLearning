@@ -36,6 +36,7 @@ trait BreezeParameters extends VectoredParameters {
 
   override def slice(range: Bucket, sparse: Boolean): Vector = {
     sliceRequirements(range)
+    val x: BreezeDenseVector[Double] = flatten(range.getStart.toInt to range.getEnd.toInt)
     if (sparse)
       SparseVector.sparseVectorConverter.convert(flatten(range.getStart.toInt to range.getEnd.toInt))
     else

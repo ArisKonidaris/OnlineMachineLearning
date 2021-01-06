@@ -1,20 +1,20 @@
 package mlAPI.safezones
 
-import mlAPI.parameters.BreezeParameters
+import mlAPI.parameters.{BreezeParameters, DLParams, VectoredParameters}
 
 /**
  * The variance safe zone function of the FGM distributed learning protocol.
  *
  * @param threshold The threshold of the FMG safe zone function.
  */
-case class VarianceSafeZone(private var threshold: Double = 0.008)
+case class VarianceSafeZone(private var threshold: Double = 0.0008)
   extends SafeZone {
 
   var sqrtThreshold: Double = scala.math.sqrt(threshold)
 
   /** Calculation of the Zeta safe zone function. */
-  override def zeta(globalModel: BreezeParameters, model: BreezeParameters): Double =
-      sqrtThreshold - scala.math.sqrt(breeze.linalg.norm(globalModel.flatten - model.flatten))
+  override def zeta(globalModel: VectoredParameters, model: VectoredParameters): Double =
+    sqrtThreshold - (globalModel - model).asInstanceOf[VectoredParameters].FrobeniusNorm
 
   override def newRoundZeta(): Double = sqrtThreshold
 

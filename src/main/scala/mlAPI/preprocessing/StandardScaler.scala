@@ -58,9 +58,8 @@ case class StandardScaler() extends learningPreprocessor {
     }
   }
 
-  private def scale(point: Point): Vector = {
+  private def scale(point: Point): Vector =
     ((point.getNumericVector.asBreeze - mean) / sqrt((1.0 / count) * d_squared)).fromBreeze
-  }
 
   def getMean: BreezeDenseVector[Double] = mean
 
@@ -113,10 +112,10 @@ case class StandardScaler() extends learningPreprocessor {
             if (mean == null || mean.size == new_mean.size)
               mean = new_mean
             else
-              throw new RuntimeException("Invalid size of new mean vector for the StandardScaler")
+              throw new RuntimeException("Invalid size of new mean vector for the StandardScaler.")
           } catch {
             case e: Exception =>
-              println("Error while trying to update the mean vector of StandardScaler")
+              println("Error while trying to update the mean vector of StandardScaler.")
               e.printStackTrace()
           }
 
@@ -126,10 +125,10 @@ case class StandardScaler() extends learningPreprocessor {
             if (d_squared == null || d_squared.size == new_DSquared.size)
               d_squared = new_DSquared
             else
-              throw new RuntimeException("Invalid size of new variance vector for the StandardScaler")
+              throw new RuntimeException("Invalid size of new variance vector for the StandardScaler.")
           } catch {
             case e: Exception =>
-              println("Error while trying to update the variance vector of StandardScaler")
+              println("Error while trying to update the variance vector of StandardScaler.")
               e.printStackTrace()
           }
 
@@ -139,7 +138,7 @@ case class StandardScaler() extends learningPreprocessor {
               d_squared = (1.0 * count) * d_squared
             } catch {
               case e: Exception =>
-                println("Error while trying to update the counter of StandardScaler")
+                println("Error while trying to update the counter of StandardScaler.")
                 e.printStackTrace()
             }
 
@@ -157,7 +156,7 @@ case class StandardScaler() extends learningPreprocessor {
             learnable = value.asInstanceOf[Boolean]
           } catch {
             case e: Exception =>
-              println("Error while trying to update the learnable flag of StandardScaler")
+              println("Error while trying to update the learnable flag of StandardScaler.")
               e.printStackTrace()
           }
 

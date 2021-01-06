@@ -1,9 +1,7 @@
 package mlAPI.parameters
 
+import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, Vector}
-import mlAPI.utils.Sizable
-
-import java.io.Serializable
 
 /**
  * A Serializable POJO case class for sending the parameters over the Network.
@@ -20,8 +18,8 @@ import java.io.Serializable
 case class ParameterDescriptor(var paramSizes: Array[Int],
                                var params: Vector,
                                var bucket: Bucket,
-                               var dataStructure: Serializable,
-                               var miscellaneous: Serializable,
+                               var dataStructure: CountableSerial,
+                               var miscellaneous: CountableSerial,
                                var fitted: Long)
   extends java.io.Serializable {
 
@@ -35,9 +33,9 @@ case class ParameterDescriptor(var paramSizes: Array[Int],
 
   def getBucket: Bucket = bucket
 
-  def getDataStructure: Serializable = dataStructure
+  def getDataStructure: CountableSerial = dataStructure
 
-  def getMiscellaneous: Serializable = miscellaneous
+  def getMiscellaneous: CountableSerial = miscellaneous
 
   def getFitted: Long = fitted
 
@@ -49,11 +47,20 @@ case class ParameterDescriptor(var paramSizes: Array[Int],
 
   def setBucket(bucket: Bucket): Unit = this.bucket = bucket
 
-  def setDataStructure(dataStructure: Serializable): Unit = this.dataStructure = dataStructure
+  def setDataStructure(dataStructure: CountableSerial): Unit = this.dataStructure = dataStructure
 
-  def setMiscellaneous(miscellaneous: Serializable): Unit = this.miscellaneous = miscellaneous
+  def setMiscellaneous(miscellaneous: CountableSerial): Unit = this.miscellaneous = miscellaneous
 
   def setFitted(fitted: Long): Unit = this.fitted = fitted
+
+  def getSize: Int = {
+    { if (paramSizes != null) 4 * paramSizes.length else 0 } +
+      { if (params != null) params.getSize else 0 } +
+      { if (bucket != null) bucket.getSize else 0 } +
+      { if (dataStructure != null) dataStructure.getSize else 0 } +
+      { if (miscellaneous != null) miscellaneous.getSize else 0 } +
+      { if (fitted != null) 8 else 0 }
+  }
 
 }
 

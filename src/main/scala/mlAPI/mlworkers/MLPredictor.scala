@@ -45,7 +45,7 @@ class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with Remot
   def configureWorker(request: Request): MLPredictor = {
 
     // Setting the ML node parameters
-    val config: mutable.Map[String, AnyRef] = request.getTraining_configuration.asScala
+    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
     if (config == null) throw new RuntimeException("Empty configuration map.")
 
     // Setting the ML pipeline
@@ -126,7 +126,7 @@ class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with Remot
    * (or a slice of it) arrives from the parameter server.
    */
   @DefaultOp
-  override def updateModel(mDesc: ParameterDescriptor): Unit = {
+  def updateModel(mDesc: ParameterDescriptor): Unit = {
     if (getNumberOfHubs == 1) {
       ml_pipeline.getLearner.setParameters(ml_pipeline.getLearner.generateParameters(mDesc).getCopy)
     } else {

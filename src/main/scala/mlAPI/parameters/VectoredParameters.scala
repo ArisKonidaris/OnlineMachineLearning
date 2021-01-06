@@ -1,6 +1,6 @@
 package mlAPI.parameters
 
-import mlAPI.math.Vector
+import mlAPI.math.{DenseVector, SparseVector, Vector}
 
 trait VectoredParameters extends LearningParameters {
 
@@ -40,6 +40,12 @@ trait VectoredParameters extends LearningParameters {
 
   def slice(range: Bucket): Vector = slice(range, sparse = false)
 
-  def sliceRequirements(range: Bucket): Unit = require(range.getEnd <= getSize - 1)
+  def toDense(vector: Vector): DenseVector = {
+    vector match {
+      case dense: DenseVector => dense
+      case sparse: SparseVector => sparse.toDenseVector
+      case _ => throw new RuntimeException("Unknown vector type.")
+    }
+  }
 
 }

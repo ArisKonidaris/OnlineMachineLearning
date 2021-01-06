@@ -3,10 +3,11 @@ package mlAPI.learners.classification
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.learners.{Learner, OnlineLearner}
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, VectorBias, VectorBiasList}
+import mlAPI.learners.Learner
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorBias, VectorBiasList}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.scores.Scores
+import mlAPI.utils.Parsing
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -15,23 +16,21 @@ import scala.collection.JavaConverters._
 /**
   * Multi-class Passive Aggressive Classifier.
   */
-case class MultiClassPA(override protected var targetLabel: Double = 1.0)
-  extends OnlineLearner with Classifier with Serializable {
+case class MultiClassPA() extends Classifier with Serializable {
 
+  override protected var targetLabel: Double = 1.0
+  override protected var miniBatchSize: Int = 1
   override protected val parallelizable: Boolean = true
-
   protected var updateType: String = "PA-II"
-
   protected var C: Double = 0.01
-
   protected var weights: VectorBiasList = _
-
   protected var nClasses: Int = 3
 
-  override def initialize_model(data: Point): Unit = {
+  override def initializeModel(data: Point): Learner = {
     val vbl: ListBuffer[VectorBias] = ListBuffer[VectorBias]()
     for (_ <- 0 until nClasses) vbl.append(VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0))
     weights = VectorBiasList(vbl)
+    this
   }
 
   override def predict(data: Point): Option[Double] = {
@@ -49,6 +48,13 @@ case class MultiClassPA(override protected var targetLabel: Double = 1.0)
     } catch {
       case _: Throwable => None
     }
+  }
+
+  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+    val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
+    for (point <- batch)
+      predictions append predict(point)
+    predictions.toArray
   }
 
   override def fit(data: Point): Unit = {
@@ -87,6 +93,13 @@ case class MultiClassPA(override protected var targetLabel: Double = 1.0)
     }
   }
 
+  override def fit(batch: ListBuffer[Point]): Unit = {
+    fitLoss(batch)
+    ()
+  }
+
+  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
@@ -102,7 +115,7 @@ case class MultiClassPA(override protected var targetLabel: Double = 1.0)
 
   private def checkParameters(data: Point): Unit = {
     if (weights == null) {
-      initialize_model(data)
+      initializeModel(data)
     } else {
       if(weights.vectorBiases.head.weights.length != data.getNumericVector.size)
         throw new RuntimeException("Incompatible model and data point size.")
@@ -157,6 +170,14 @@ case class MultiClassPA(override protected var targetLabel: Double = 1.0)
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the MultiClassPA classifier.")
+              e.printStackTrace()
+          }
         case "C" =>
           try {
             setC(value.asInstanceOf[Double])
@@ -192,7 +213,7 @@ case class MultiClassPA(override protected var targetLabel: Double = 1.0)
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBiasList().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
+  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
     new VectorBiasList().generateSerializedParams
 
   override def generatePOJOLearner: LearnerPOJO = {

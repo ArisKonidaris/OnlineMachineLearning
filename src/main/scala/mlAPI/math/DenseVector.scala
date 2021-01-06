@@ -134,12 +134,23 @@ case class DenseVector(var data: Array[Double]) extends Vector with Serializable
     */
   def toSparseVector: SparseVector = {
     val nonZero = (0 until size).zip(data).filter(_._2 != 0)
-
+//    val nonZero = (0 until size).zip(data).filter(x => scala.math.abs(x._2) > 1e-6)
     SparseVector.fromCOO(size, nonZero)
   }
 
   override def toList: List[Double] = data.toList
 
+  /** Converts the vector to an Array of Doubles
+   *
+   * @return An Array of Doubles
+   */
+  override def toArray: Array[Double] = data
+
+  /** Calculates the byte size of the Vector
+   *
+   * @return The size of the Vector in bytes
+   */
+  override def getSize: Int = 8 * data.length
 }
 
 object DenseVector {

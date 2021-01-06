@@ -3,45 +3,54 @@ package mlAPI.learners.regression
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.learners.{Learner, OnlineLearner}
-import mlAPI.parameters.{LearningParameters, MatrixBias, ParameterDescriptor}
+import mlAPI.learners.Learner
+import mlAPI.parameters.{LearningParameters, MatrixBias, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
 import breeze.linalg.{DenseVector => BreezeDenseVector, _}
 import mlAPI.scores.Scores
+import mlAPI.utils.Parsing
 
 /**
   * Online Ridge Regression.
   */
-case class ORR() extends OnlineLearner with Regressor with Serializable {
+case class ORR() extends Regressor with Serializable {
 
+  override protected var miniBatchSize: Int = 1
   override protected val parallelizable: Boolean = true
-
   protected var weights: MatrixBias = _
-
   protected var lambda: Double = 0.0
 
-  override def initialize_model(data: Point): Unit = weights = model_init(data.getNumericVector.size + 1)
+  override def initializeModel(data: Point): Learner = {
+    weights = modelInit(data.getNumericVector.size + 1)
+    this
+  }
 
   override def predict(data: Point): Option[Double] = {
     try {
-      val x: BreezeDenseVector[Double] = add_bias(data)
+      val x: BreezeDenseVector[Double] = addBias(data)
       Some(weights.b.t * pinv(weights.A) * x)
     } catch {
       case e: Exception => e.printStackTrace()
         None
     }
   }
+  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+    val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
+    for (point <- batch)
+      predictions append predict(point)
+    predictions.toArray
+  }
 
   override def fit(data: Point): Unit = {
-    val x: BreezeDenseVector[Double] = add_bias(data)
+    val x: BreezeDenseVector[Double] = addBias(data)
     try {
       weights += MatrixBias(x * x.t, data.asInstanceOf[LabeledPoint].label * x)
     } catch {
       case _: Exception =>
-        if (weights == null) initialize_model(data)
+        if (weights == null) initializeModel(data)
         fit(data)
     }
   }
@@ -54,16 +63,23 @@ case class ORR() extends OnlineLearner with Regressor with Serializable {
     loss
   }
 
+  override def fit(batch: ListBuffer[Point]): Unit = {
+    fit(batch)
+    ()
+  }
+
+  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.RMSE(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
-  private def model_init(n: Int): MatrixBias = {
+  private def modelInit(n: Int): MatrixBias = {
     MatrixBias(lambda * diag(BreezeDenseVector.fill(n) {0.0}),
       BreezeDenseVector.fill(n) {0.0}
     )
   }
 
-  private def add_bias(data: Point): BreezeDenseVector[Double] = {
+  private def addBias(data: Point): BreezeDenseVector[Double] = {
     BreezeDenseVector.vertcat(
       data.getNumericVector.asBreeze.asInstanceOf[BreezeDenseVector[Double]],
       BreezeDenseVector.ones(1))
@@ -120,6 +136,14 @@ case class ORR() extends OnlineLearner with Regressor with Serializable {
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 64)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the ORR regressor.")
+              e.printStackTrace()
+          }
         case "lambda" =>
           try {
             setLambda(value.asInstanceOf[Double])
@@ -149,7 +173,7 @@ case class ORR() extends OnlineLearner with Regressor with Serializable {
 
   override def generateParameters: ParameterDescriptor => LearningParameters = new MatrixBias().generateParameters
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => java.io.Serializable =
+  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
     new MatrixBias().generateSerializedParams
 
 }

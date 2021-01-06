@@ -303,7 +303,7 @@ class HoeffdingTree(private var discrete: Boolean = false,
     tree.createLeafMap(leafMap)
     range = descriptor.getRange
     maxLabel = descriptor.getMaxLabel
-    size = descriptor.getSize
+    size = descriptor.getTreeSize
     height = descriptor.getHeight
     numberOfInternalNodes = descriptor.getNumberOfInternalNodes
     numberOfLeaves = descriptor.getNumberOfLeaves

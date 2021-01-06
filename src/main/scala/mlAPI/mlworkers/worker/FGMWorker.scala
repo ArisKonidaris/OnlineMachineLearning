@@ -4,7 +4,7 @@ import BipartiteTopologyAPI.annotations.{InitOp, ProcessOp, QueryOp}
 import ControlAPI.{QueryResponse, Request}
 import mlAPI.math.Point
 import mlAPI.mlworkers.interfaces.Querier
-import mlAPI.parameters.{BreezeParameters, ParameterDescriptor}
+import mlAPI.parameters.{BreezeParameters, ParameterDescriptor, VectoredParameters}
 import mlAPI.protocols.fgm.{FGMHubInterface, FGMRemoteLearner, Increment, Quantum, ZetaValue}
 import mlAPI.safezones.{SafeZone, VarianceSafeZone}
 import mlAPI.utils.Parsing
@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
+case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone())
   extends VectoredWorker[FGMHubInterface, Querier] with FGMRemoteLearner {
 
   protocol = "FGM-protocol"
@@ -48,14 +48,13 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
    * @param modelDescriptor The new model and the new quantum send by the coordinator in order to start a new FGM round.
    * */
   override def reset(modelDescriptor: ParameterDescriptor): Unit = {
-    updateLocalModels(modelDescriptor) // Update the model of the local learner.
+    updateLocalModel(modelDescriptor) // Update the model of the local learner.
     zeta = safeZone.newRoundZeta()
     counter = 0 // Reset the worker counter.
-    quantum = modelDescriptor.miscellaneous.asInstanceOf[Array[Double]](0) // Update the quantum.
-    processedData = 0 // Reset the processed data point counter.
+    quantum = modelDescriptor.miscellaneous.asInstanceOf[Quantum].getValue // Update the quantum.
     activeSubRound = true // Reset the active sub round flag.
     subRound += 1 // Update the current running subround.
-//    println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + subRound + ", zeta: " + zeta)
+    println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + subRound + ", zeta: " + zeta)
   }
 
   /** The consumption of a data point by the Machine Learning worker.
@@ -65,11 +64,11 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   @ProcessOp
   def receiveTuple(data: Point): Unit = {
     fit(data)
-    if (activeSubRound && (processedData % (miniBatchSize * miniBatches) == 0)) {
+    if (activeSubRound && (processedData % (getMiniBatchSize * miniBatches) == 0)) {
       if (subRound > 0) { // Check distance from the safe zone boundary
         val z = safeZone.zeta(
-          globalModel.asInstanceOf[BreezeParameters],
-          getLearnerParams.asInstanceOf[Option[BreezeParameters]].get
+          getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
+          getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
         )
 //        println("Worker " + getNodeId + ", z: " + z)
         val distFromBoundary: Long = scala.math.floor((zeta - z) / quantum).toLong
@@ -97,13 +96,12 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   override def sendLocalDrift(): Unit = {
     assert(!activeSubRound)
     val serializedDrift: Array[ParameterDescriptor] = {
-      if (processedData > 0) {
-        val sd: Array[ParameterDescriptor] = ModelMarshalling()
-        assert(sd.length == 1)
-        sd
-      } else
+      if (processedData > 0)
+        ModelMarshalling()
+      else
         Array(ParameterDescriptor(null, null, null, null, null, 0))
     }
+    processedData = 0
     getProxy(0).receiveLocalDrift(serializedDrift(0)).toSync(reset)
 //    println("Worker " + getNodeId + " sent local drift.")
   }
@@ -111,8 +109,8 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   /** Sending the safe zone function value to the coordinator. */
   override def requestZeta(): Unit = {
     activeSubRound = false // Stop calculating and sending increments.
-    tempZeta = safeZone.zeta(globalModel.asInstanceOf[BreezeParameters],
-      getLearnerParams.asInstanceOf[Option[BreezeParameters]].get
+    tempZeta = safeZone.zeta(getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
+      getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
     )
     getProxy(0).receiveZeta(ZetaValue(tempZeta))
 //    println("Worker " + getNodeId + " sent local zeta.")
@@ -134,28 +132,6 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
   /** Pull the global model. */
   def pull(): Unit = getProxy(0).pullModel.toSync(reset)
 
-  /** Update the local model.
-   *
-   * @param modelDescriptor The model sent by the coordinator.
-   * */
-  def updateLocalModels(modelDescriptor: ParameterDescriptor): Unit = {
-    globalModel = mlPipeline.getLearner.generateParameters(modelDescriptor)
-    mlPipeline.getLearner.setParameters(globalModel.getCopy)
-    mlPipeline.setFittedData(modelDescriptor.getFitted)
-  }
-
-  /** This method responds to a query for the Machine Learning worker.
-   *
-   * @param test_set The test set that the predictive performance of the model should be calculated on.
-   */
-  @QueryOp
-  def query(queryId: Long, queryTarget: Int, test_set: Array[java.io.Serializable]): Unit = {
-    val pj = mlPipeline.generatePOJO(ListBuffer(test_set: _ *).asInstanceOf[ListBuffer[Point]])
-    getQuerier.sendQueryResponse(
-      new QueryResponse(queryId, queryTarget, pj._1.asJava, pj._2, protocol, pj._3, pj._4, pj._5, pj._6)
-    )
-  }
-
   def setSafeZone(safeZone: SafeZone): Unit = this.safeZone = safeZone
 
   def getSafeZone: SafeZone = {
@@ -167,16 +143,16 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
     super.configureWorker(request)
 
     // Setting the ML node parameters.
-    val config: mutable.Map[String, AnyRef] = request.getTraining_configuration.asScala
+    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
 
-    if (config.contains("safe_zone")) {
+    if (config.contains("safeZone")) {
       try {
         setSafeZone(
-          config("safe_zone").asInstanceOf[String] match {
+          config("safeZone").asInstanceOf[String] match {
             case "ModelVariance" =>
               if (config.contains("threshold")) {
                 try {
-                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.0008))
+                  VarianceSafeZone(Parsing.DoubleParsing(config, "threshold", 0.008))
                 } catch {
                   case _: Throwable => VarianceSafeZone()
                 }
@@ -190,6 +166,32 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(0.0008))
     }
 
     this
+  }
+
+  /** This method responds to a query for the Machine Learning worker.
+   *
+   * @param predicates The predicated of the query.
+   */
+  @QueryOp
+  def query(queryId: Long, queryTarget: Int, predicates: (Double, Array[Point])): Unit = {
+    val pj = mlPipeline.generatePOJO
+    val score = getGlobalPerformance(ListBuffer(predicates._2: _ *))
+    if (queryId == -1)
+      getQuerier.sendQueryResponse(
+        new QueryResponse(-1,
+          queryTarget,
+          null,
+          null,
+          null,
+          processedData,
+          null,
+          predicates._1,
+          score)
+      )
+    else
+      getQuerier.sendQueryResponse(
+        new QueryResponse(queryId, queryTarget, pj._1.asJava, pj._2, protocol, pj._3, pj._4, pj._5, score)
+      )
   }
 
 }

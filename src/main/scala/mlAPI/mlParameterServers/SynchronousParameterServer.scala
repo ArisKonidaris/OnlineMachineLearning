@@ -2,11 +2,12 @@ package mlAPI.mlParameterServers
 
 import java.io.Serializable
 import BipartiteTopologyAPI.annotations.{InitOp, MergeOp, ProcessOp, QueryOp}
-import BipartiteTopologyAPI.futures.{PromiseResponse, Response}
+import BipartiteTopologyAPI.futures.{BroadcastValueResponse, PromiseResponse, Response}
 import mlAPI.math.DenseVector
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.ParameterDescriptor
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.protocols.periodic.synchronous.SynchronousStatistics
 import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 
 /**
@@ -15,6 +16,8 @@ import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querier] with PullPush {
 
   println("Synchronous Hub initialized.")
+
+  protocolStatistics = SynchronousStatistics()
 
   /** A helping counter. */
   var counter: Int = 0
@@ -62,15 +65,15 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
    * */
   override def pullModel: Response[ParameterDescriptor] = {
     assert(getCurrentCaller != 0)
-    makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
+    protocolStatistics.updateNumOfBlocks()
     counter += 1
+    makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
     if (globalModel == null)
       Response.noResponse()
     else if (counter == parallelism) {
       counter = 0
       warmedUp = true
-      incrementNumberOfShippedModels(parallelism)
-      fulfillBroadcastPromise(sendModel().getValue)
+      broadcastModel()
     } else
       Response.noResponse()
   }
@@ -82,20 +85,21 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
    * */
   override def pushModel(modelDescriptor: ParameterDescriptor): Response[ParameterDescriptor] = {
     updateGlobalState(modelDescriptor)
+    protocolStatistics.updateNumOfBlocks()
+    protocolStatistics.updateModelsShipped()
+    protocolStatistics.updateBytesShipped(modelDescriptor.getSize)
     if (warmedUp) {
       makeBroadcastPromise(new PromiseResponse[ParameterDescriptor]())
       counter += 1
       if (counter == getNumberOfSpokes) {
         counter = 0
-        incrementNumberOfShippedModels(parallelism)
-        fulfillBroadcastPromise(sendModel().getValue)
+        broadcastModel()
       } else
         Response.noResponse()
     } else if (counter == parallelism) {
       warmedUp = true
       counter = 0
-      incrementNumberOfShippedModels(parallelism)
-      fulfillBroadcastPromise(sendModel().getValue)
+      broadcastModel()
     } else
       Response.noResponse()
   }
@@ -107,8 +111,6 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
   def updateGlobalState(remoteModelDescriptor: ParameterDescriptor): Unit = {
     val remoteVector: BreezeDenseVector[Double] = deserializeVector(remoteModelDescriptor)
     incrementNumberOfFittedData(remoteModelDescriptor.getFitted)
-    incrementNumberOfReceivedModels()
-//    printStatistics()
     if (globalModel == null) {
       assertWarmup(remoteModelDescriptor)
       globalModel = remoteVector
@@ -121,6 +123,13 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
       else
         globalModel += remoteVector
     }
+  }
+
+  def broadcastModel(): BroadcastValueResponse[ParameterDescriptor] = {
+    val packagedModel: ParameterDescriptor = sendModel().getValue
+    protocolStatistics.updateModelsShipped(parallelism)
+    protocolStatistics.updateBytesShipped(parallelism * packagedModel.getSize)
+    fulfillBroadcastPromise(packagedModel)
   }
 
   /** A marshalled model response.

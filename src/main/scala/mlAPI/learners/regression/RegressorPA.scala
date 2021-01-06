@@ -11,11 +11,11 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.utils.Parsing
 
-case class regressorPA() extends PassiveAggressiveLearners with Regressor with Serializable {
+case class RegressorPA() extends PassiveAggressiveLearners with Regressor with Serializable {
 
   weights = new lin_params()
-
   private var epsilon: Double = 0.0
 
   override def predict(data: Point): Option[Double] = predictWithMargin(data)
@@ -47,7 +47,7 @@ case class regressorPA() extends PassiveAggressiveLearners with Regressor with S
   override def score(test_set: ListBuffer[Point]): Double =
     Scores.RMSE(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
-  def setEpsilon(epsilon: Double): regressorPA = {
+  def setEpsilon(epsilon: Double): RegressorPA = {
     this.epsilon = epsilon
     this
   }
@@ -55,6 +55,14 @@ case class regressorPA() extends PassiveAggressiveLearners with Regressor with S
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the RegressorPA regressor.")
+              e.printStackTrace()
+          }
         case "epsilon" =>
           try {
             setEpsilon(value.asInstanceOf[Double])

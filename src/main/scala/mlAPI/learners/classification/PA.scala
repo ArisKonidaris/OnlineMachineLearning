@@ -6,6 +6,7 @@ import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
 import mlAPI.parameters.VectorBias
 import mlAPI.scores.Scores
+import mlAPI.utils.Parsing
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -14,8 +15,9 @@ import scala.collection.JavaConverters._
 /**
   * Passive Aggressive Classifier.
   */
-case class PA(override protected var targetLabel: Double = 1.0)
-  extends PassiveAggressiveLearners with Classifier with Serializable {
+case class PA() extends PassiveAggressiveLearners with Classifier with Serializable {
+
+  override protected var targetLabel: Double = 1.0
 
   override def predict(data: Point): Option[Double] = {
     predictWithMargin(data) match {
@@ -56,6 +58,14 @@ case class PA(override protected var targetLabel: Double = 1.0)
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): mlAPI.learners.Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
+        case "miniBatchSize" =>
+          try {
+            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 1)
+          } catch {
+            case e: Exception =>
+              println("Error while trying to update the miniBatchSize hyper parameter of the PA classifier.")
+              e.printStackTrace()
+          }
         case "C" =>
           try {
             setC(value.asInstanceOf[Double])
@@ -88,7 +98,5 @@ case class PA(override protected var targetLabel: Double = 1.0)
       null
     )
   }
-
-
 
 }

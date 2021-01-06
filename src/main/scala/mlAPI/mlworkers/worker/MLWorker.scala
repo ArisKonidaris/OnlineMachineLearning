@@ -25,27 +25,19 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   /** The total number of data points fitted to the local Machine Learning pipeline since the last synchronization. */
   protected var processedData: Long = 0
 
-  /** The size of the mini batch, or else, the number of distinct data points
-   * that are fitted to the Machine Learning pipeline in single fit operation.
-   */
-  protected var miniBatchSize: Int = 64
-
   /** The number of mini-batches fitted by the worker before checking
    * if it should push its parameters to the parameter server.
    */
-  protected var miniBatches: Int = 4
+  protected var miniBatches: Int = 256
 
   /** The warmup size of the distributed learning procedure. */
-  protected var warmupSize: Int = 64
+  protected var warmupSize: Int = 256
 
   /** The local Machine Learning pipeline to train in on streaming data. */
-  protected implicit var mlPipeline: MLPipeline = new MLPipeline()
+  protected var mlPipeline: MLPipeline = new MLPipeline()
 
   /** The global model. */
-  protected var globalModel: LearningParameters = _
-
-  /** The grace period between the calculation of the loss. */
-  protected var nMinLoss: Long = 10
+  protected var globalModel: MLPipeline = new MLPipeline()
 
   // =============================================== Getters ===========================================================
 
@@ -53,7 +45,7 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
   def getProcessedData: Long = processedData
 
-  def getMiniBatchSize: Int = miniBatchSize
+  def getMiniBatchSize: Int = getMLPipeline.getLearner.getMiniBatchSize
 
   def getMiniBatches: Int = miniBatches
 
@@ -61,37 +53,38 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
   def getMLPipeline: MLPipeline = mlPipeline
 
-  def getLearnerParams: Option[LearningParameters] = mlPipeline.getLearner.getParameters
+  def getMLPipelineParams: Option[LearningParameters] = mlPipeline.getLearner.getParameters
 
-  def getGlobalModel: LearningParameters = globalModel
+  def getGlobalModel: MLPipeline = globalModel
 
-  def getNMinLoss: Long = nMinLoss
+  def getGlobalParams: Option[LearningParameters] = globalModel.getLearner.getParameters
 
   // =============================================== Setters ===========================================================
 
   def setProtocol(protocol: String): Unit = this.protocol = protocol
 
-  def setProcessedData(processed_data: Long): Unit = this.processedData = processed_data
+  def setProcessedData(processedData: Long): Unit = this.processedData = processedData
 
-  def setMiniBatchSize(mini_batch_size: Int): Unit = this.miniBatchSize = mini_batch_size
+  def setMiniBatchSize(miniBatchSize: Int): Unit = getMLPipeline.getLearner.setMiniBatchSize(miniBatchSize)
 
-  def setMiniBatches(mini_batches: Int): Unit = this.miniBatches = mini_batches
+  def setMiniBatches(miniBatches: Int): Unit = this.miniBatches = miniBatches
 
   def setWarmupSize(warmUpSize: Int): Unit = this.warmupSize = warmUpSize
 
-  def setMLPipeline(ml_pipeline: MLPipeline): Unit = this.mlPipeline = ml_pipeline
+  def setMLPipeline(mlPipeline: MLPipeline): Unit = this.mlPipeline = mlPipeline
 
-  def setLearnerParams(params: LearningParameters): Unit = mlPipeline.getLearner.setParameters(params)
+  def setMLPipelineParams(params: LearningParameters): Unit = mlPipeline.getLearner.setParameters(params)
 
-  def setGlobalModel(global_model: LearningParameters): Unit = this.globalModel = global_model
+  def setMLPipelineParams(mDesc: ParameterDescriptor): Unit = setMLPipelineParams(deserializeParams(mDesc))
 
-  def setDeepGlobalModel(global_model: LearningParameters): Unit = this.globalModel = global_model.getCopy
+  def setGlobalModel(globalModel: MLPipeline): Unit = this.globalModel = globalModel
 
-  def setNMinLoss(nMinLoss: Long): Unit = this.nMinLoss = nMinLoss
+  def setGlobalModelParams(params: LearningParameters): Unit = globalModel.getLearner.setParameters(params)
+
+  def setGlobalModelParams(mDesc: ParameterDescriptor): Unit = setGlobalModelParams(deserializeParams(mDesc))
+
 
   // ======================================== ML worker basic operations ===============================================
-
-
 
   /** This method configures an Online Machine Learning worker by using a creation Request.
    *
@@ -102,52 +95,37 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def configureWorker(request: Request): MLWorker[ProxyIfc, QueryIfc] = {
 
     // Setting the ML node parameters.
-    val config: mutable.Map[String, AnyRef] = request.getTraining_configuration.asScala
+    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
 
-    if (config == null) throw new RuntimeException("Empty training configuration map.")
+    if (config == null)
+      throw new RuntimeException("Empty training configuration map.")
 
-    if (config.contains("mini_batch_size")) {
+    if (config.contains("miniBatches"))
       try {
-        setMiniBatchSize(Parsing.IntegerParsing(config, "mini_batch_size", 64))
+        setMiniBatches(Parsing.IntegerParsing(config, "miniBatches", 256))
       } catch {
         case e: Throwable => e.printStackTrace()
       }
-    }
 
-    if (config.contains("mini_batches")) {
-      try {
-        setMiniBatches(Parsing.IntegerParsing(config, "mini_batches", 4))
-      } catch {
-        case e: Throwable => e.printStackTrace()
-      }
-    }
-
-    if (config.contains("protocol")) {
+    if (config.contains("protocol"))
       try {
         setProtocol(config("protocol").asInstanceOf[String])
       } catch {
         case e: Throwable => e.printStackTrace()
       }
-    } else setProtocol("Asynchronous")
+    else
+      setProtocol("Asynchronous")
 
-    if (config.contains("n_min_loss")) {
+    if (config.contains("warmupSize"))
       try {
-        setNMinLoss(config("n_min_loss").asInstanceOf[Double].toLong)
+        setWarmupSize(Parsing.IntegerParsing(config, "warmupSize", 256))
       } catch {
         case e: Throwable => e.printStackTrace()
       }
-    }
 
-    if (config.contains("warmup_size")) {
-      try {
-        setWarmupSize(Parsing.IntegerParsing(config, "warmup_size", 64))
-      } catch {
-        case e: Throwable => e.printStackTrace()
-      }
-    }
-
-    // Setting the ML pipeline
+    // Setting the ML pipeline and the global model.
     mlPipeline.configureMLPipeline(request)
+    globalModel.configureMLPipeline(request)
 
     this
   }
@@ -155,16 +133,18 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   /** Clears the Machine Learning worker. */
   def clear(): MLWorker[ProxyIfc, QueryIfc] = {
     processedData = 0
-    miniBatchSize = 64
     miniBatches = 4
     mlPipeline.clear()
-    globalModel = null
+    globalModel.clear()
     this
   }
 
   /** The method called on a data point to train the ML Pipeline. */
   def fit(data: Point): Unit = {
-    if (processedData % nMinLoss == 0) mlPipeline.fit(data) else mlPipeline.fitLoss(data)
+    if ((processedData + 1) % getMiniBatchSize == 0)
+      mlPipeline.fitLoss(data)
+    else
+      mlPipeline.fit(data)
     processedData += 1
   }
 
@@ -185,12 +165,37 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
   /** A method for calculating the performance of the local model.
    *
-   * @param test_set The test set to calculate the performance on.
+   * @param testSet The test set to calculate the performance on.
    * @return A String representation of the performance of the model.
    */
-  def getPerformance(test_set: ListBuffer[Point]): String = mlPipeline.score(test_set).toString
+  def getPerformance(testSet: ListBuffer[Point]): Double = mlPipeline.score(testSet)
+
+  /** A method for calculating the performance of the global model.
+   *
+   * @param testSet The test set to calculate the performance on.
+   * @return A String representation of the performance of the model.
+   */
+  def getGlobalPerformance(testSet: ListBuffer[Point]): Double = globalModel.score(testSet)
 
   /** Converts the model into a Serializable POJO case class to be send over the Network. */
   def ModelMarshalling(sparse: Boolean, drift: Boolean): Array[ParameterDescriptor]
+
+  /** A method for deserializing the parameters received by the coordinaor. */
+  def deserializeParams(mDesc: ParameterDescriptor): LearningParameters = mlPipeline.getLearner.generateParameters(mDesc)
+
+  /** A method for updating the global model. */
+  def updateGlobalModel(mDesc: ParameterDescriptor): Unit = {
+    setGlobalModelParams(mDesc)
+    if (globalModel.getFittedData < mDesc.getFitted)
+      globalModel.setFittedData(mDesc.getFitted)
+  }
+
+  /** A method for updating the local machine learning model. */
+  def updateLocalModel(mDesc: ParameterDescriptor): Unit = {
+    updateGlobalModel(mDesc)
+    setMLPipelineParams(getGlobalParams.get.getCopy)
+    if (mlPipeline.getFittedData < mDesc.getFitted)
+      mlPipeline.setFittedData(mDesc.getFitted)
+  }
 
 }

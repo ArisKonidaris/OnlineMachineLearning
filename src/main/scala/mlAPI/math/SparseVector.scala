@@ -2,6 +2,7 @@ package mlAPI.math
 
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector, Vector => BreezeVector}
 
+import scala.annotation.tailrec
 import scala.util.Sorting
 
 /** Sparse vector implementation storing the data request two arrays. One index contains the sorted
@@ -183,6 +184,32 @@ case class SparseVector(var size: Int, var indices: Array[Int], var data: Array[
 
   override def toList: List[Double] = toDenseVector.toList
 
+  /** Converts the vector to an Array of Doubles
+   *
+   * @return An Array of Doubles
+   */
+  override def toArray: Array[Double] = {
+    @tailrec
+    def makeArray(index: Int, indices: Array[Int], data: Array[Double], result: Array[Double]): Array[Double] = {
+      if (index == size)
+        result
+      else
+        if (index == indices.head) {
+          val newResult = result ++ Array(data.head)
+          makeArray(index + 1, indices.tail, data.tail, newResult)
+        } else {
+          val newResult = result ++ Array(0.0)
+          makeArray(index + 1, indices, data, newResult)
+        }
+    }
+    makeArray(0, indices, data, Array[Double]())
+  }
+
+  /** Calculates the byte size of the Vector
+   *
+   * @return The size of the Vector in bytes
+   */
+  override def getSize: Int = 4 + 4 * indices.length + 8 * data.length
 }
 
 object SparseVector {

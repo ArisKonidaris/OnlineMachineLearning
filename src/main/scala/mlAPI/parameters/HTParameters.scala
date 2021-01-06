@@ -1,7 +1,8 @@
 package mlAPI.parameters
 
-import java.io
+import ControlAPI.CountableSerial
 
+import java.io
 import mlAPI.learners.classification.trees.HoeffdingTree
 import mlAPI.learners.classification.trees.serializable.HTDescriptor
 
@@ -23,7 +24,7 @@ case class HTParameters(ht: HoeffdingTree) extends LearningParameters {
     })
   }
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => io.Serializable = {
+  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
     (lPar: LearningParameters, par: Array[_]) =>
       try {
         assert(lPar.isInstanceOf[HTParameters])
@@ -51,5 +52,8 @@ case class HTParameters(ht: HoeffdingTree) extends LearningParameters {
         throw new RuntimeException("Something happened while deserializing the HTParameters learning parameters.")
     }
   }
+
+  // TODO: Implement the equals method for the Hoeffding Tree parameters.
+  override def equals(obj: Any): Boolean = false
 
 }

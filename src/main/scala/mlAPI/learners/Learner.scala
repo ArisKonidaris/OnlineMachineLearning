@@ -2,7 +2,7 @@ package mlAPI.learners
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Point
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, WithParams}
+import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, WithParams}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -13,23 +13,38 @@ import scala.collection.mutable.ListBuffer
  */
 trait Learner extends Serializable with WithParams {
 
+  // The size of the mini batch.
+  protected var miniBatchSize: Int
+
   // An immutable variable that determines if the Learner can be parallelized.
   protected val parallelizable: Boolean
 
   // An integer indicating the update complexity of the Learner on a single data point.
-  protected var update_complexity: Int = _
+  protected var updateComplexity: Int = _
 
   // ===================================== Getters ================================================
 
-  def getParameters: Option[LearningParameters]
+  def getMiniBatchSize: Int = miniBatchSize
 
-  def getUpdateComplexity: Int = update_complexity
+  def isParallelizable: Boolean = parallelizable
+
+  def getUpdateComplexity: Int = updateComplexity
+
+  def getParameters: Option[LearningParameters]
 
   // ===================================== Setters ================================================
 
-  def setParameters(params: LearningParameters): Learner
+  def setMiniBatchSize(miniBatchSize: Int): Learner = {
+    this.miniBatchSize = miniBatchSize
+    this
+  }
 
-  def setUpdateComplexity(update_complexity: Int): Unit = this.update_complexity = update_complexity
+  def setUpdateComplexity(update_complexity: Int): Learner = {
+    this.updateComplexity = update_complexity
+    this
+  }
+
+  def setParameters(params: LearningParameters): Learner
 
   // ==================================== Main methods =============================================
 
@@ -41,15 +56,19 @@ trait Learner extends Serializable with WithParams {
 
   override def setParametersFromMap(parameterMap: mutable.Map[String, AnyRef]): Learner = this
 
+  override def setStructureFromMap(structureMap: mutable.Map[String, AnyRef]): Learner = this
+
   override def addParameter(key: String, value: AnyRef): Learner = this
 
   override def removeParameter(key: String, value: AnyRef): Learner = this
 
-  def initialize_model(): Unit = ()
+  def initializeModel(): Learner = this
 
-  def initialize_model(data: Point): Unit = ()
+  def initializeModel(data: Point): Learner = this
 
   def predict(data: Point): Option[Double]
+
+  def predict(batch: ListBuffer[Point]): Array[Option[Double]]
 
   def fit(data: Point): Unit
 
@@ -63,7 +82,7 @@ trait Learner extends Serializable with WithParams {
 
   def generateParameters: ParameterDescriptor => LearningParameters
 
-  def getSerializedParams: (LearningParameters, Array[_]) => java.io.Serializable
+  def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters
 
   def generatePOJOLearner: LearnerPOJO
 
