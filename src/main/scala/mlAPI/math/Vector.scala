@@ -76,7 +76,7 @@ trait Vector extends Serializable {
 
   /** Calculates the byte size of the Vector
    *
-   * @return The size of the VEctor in bytes
+   * @return The size of the Vector in bytes
    */
   def getSize: Int
 

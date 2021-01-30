@@ -1,16 +1,15 @@
 package mlAPI.protocols.periodic
 
 import BipartiteTopologyAPI.annotations.{RemoteOp, RemoteProxy}
-import BipartiteTopologyAPI.futures.Response
-import mlAPI.parameters.ParameterDescriptor
+import mlAPI.parameters.utils.ParameterDescriptor
 
 @RemoteProxy
-trait PullPush extends Serializable {
+trait PullPush {
 
   @RemoteOp
-  def pullModel: Response[ParameterDescriptor]
+  def pull(): Unit
 
   @RemoteOp
-  def pushModel(modelDescriptor: ParameterDescriptor): Response[ParameterDescriptor]
+  def push(modelDescriptor: ParameterDescriptor): Unit
 
 }

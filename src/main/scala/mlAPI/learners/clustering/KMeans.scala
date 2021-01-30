@@ -4,7 +4,8 @@ import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{DenseVector, Point, UnlabeledPoint}
 import mlAPI.learners.Learner
-import mlAPI.parameters.{EuclideanVector, LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorList}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.{EuclideanVector, LearningParameters, VectorList}
 import mlAPI.scores.Scores
 import mlAPI.utils.Parsing
 
@@ -298,10 +299,26 @@ case class KMeans() extends Clusterer with Serializable {
 
   override def toString = s"KMeans ${this.hashCode}"
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new VectorList().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = {
+    if (centroids == null)
+      new VectorList().generateParameters
+    else
+      centroids.generateParameters
+  }
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
-    new VectorList().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    if (centroids == null)
+      new VectorList().extractParams
+    else
+      centroids.extractParams
+  }
+
+  override def extractDivParams: (LearningParameters , Array[_]) => Array[Array[SerializableParameters]] = {
+    if (centroids == null)
+      new VectorList().extractDivParams
+    else
+      centroids.extractDivParams
+  }
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("KMeans",

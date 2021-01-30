@@ -1,6 +1,6 @@
 package mlAPI.dataBuffers
 
-import BipartiteTopologyAPI.network.Mergeable
+import BipartiteTopologyAPI.interfaces.Mergeable
 
 trait DataBuffer[T] extends Mergeable with Serializable {
 

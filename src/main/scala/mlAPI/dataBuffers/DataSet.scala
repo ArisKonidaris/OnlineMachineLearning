@@ -1,6 +1,6 @@
 package mlAPI.dataBuffers
 
-import BipartiteTopologyAPI.network.Mergeable
+import BipartiteTopologyAPI.interfaces.Mergeable
 import mlAPI.dataBuffers.removeStrategy.{RandomRemoveStrategy, RemoveOldestStrategy, RemoveStrategy}
 
 import scala.collection.mutable.ListBuffer

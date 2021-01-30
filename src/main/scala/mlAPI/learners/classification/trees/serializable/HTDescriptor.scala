@@ -1,9 +1,9 @@
 package mlAPI.learners.classification.trees.serializable
 
+import ControlAPI.CountableSerial
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import mlAPI.learners.classification.trees.serializable.nodes.NodeDescriptor
-import mlAPI.parameters.SerializedParameters
 
 /**
  * A serializable descriptor of a Hoeffding Tree.
@@ -31,7 +31,7 @@ case class HTDescriptor(var discrete: Boolean,
                         var leafCounter: Int,
                         var activeSize: Int,
                         var inactiveSize: Int)
-  extends SerializedParameters {
+  extends CountableSerial {
 
   def setDiscrete(discrete: Boolean): Unit = this.discrete = discrete
 

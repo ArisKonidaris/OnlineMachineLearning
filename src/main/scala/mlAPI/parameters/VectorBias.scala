@@ -1,8 +1,9 @@
 package mlAPI.parameters
 
-import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, SparseVector}
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.utils.{WrappedVectoredParameters => wrappedParams}
 
 import scala.collection.mutable.ListBuffer
 
@@ -15,6 +16,7 @@ case class VectorBias(var weights: BreezeDenseVector[Double], var intercept: Dou
   extends BreezeParameters {
 
   size = weights.length + 1
+  sizes = Array(weights.length, 1)
   bytes = getSize * 8
 
   def this() = this(BreezeDenseVector.zeros(1), 0)
@@ -34,8 +36,6 @@ case class VectorBias(var weights: BreezeDenseVector[Double], var intercept: Dou
     )
 
   def this(breezeSparseVector: BreezeSparseVector[Double]) = this(breezeSparseVector.toDenseVector)
-
-  override def getSizes: Array[Int] = Array(weights.size, 1)
 
   override def equals(obj: Any): Boolean = {
     obj match {
@@ -116,27 +116,51 @@ case class VectorBias(var weights: BreezeDenseVector[Double], var intercept: Dou
       intercept
     })
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par: Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, sparse: Boolean) =>
       try {
-        assert(par.length == 2 && lPar.isInstanceOf[VectorBias])
-        val sparse: Boolean = par.head.asInstanceOf[Boolean]
-        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        new SerializedVectoredParameters(
-          Array(lPar.asInstanceOf[VectorBias].weights.length, 1),
-          lPar.asInstanceOf[VectorBias].slice(bucket, sparse)
+        assert(params.isInstanceOf[VectorBias])
+        val bucket: Bucket = Bucket(0, params.asInstanceOf[VectorBias].size - 1)
+        wrappedParams(
+          Array(params.asInstanceOf[VectorBias].weights.length, 1),
+          null,
+          params.asInstanceOf[VectorBias].slice(bucket, sparse)
         )
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the VectorBias learning parameters.")
+          throw new RuntimeException("Something happened while extracting the VectorBias learning parameters.")
+      }
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
+      try {
+        assert(params.isInstanceOf[VectorBias] && args.length == 2)
+        val (sparse, quantiles) = extractSparseQuantiles(args)
+        val wrapped = ListBuffer[Array[SerializableParameters]]()
+        for (buckets: Array[Bucket] <- quantiles)
+          wrapped append {
+            val hubWrap = for (bucket: Bucket <- buckets)
+              yield wrappedParams(null, bucket, params.asInstanceOf[VectorBias].slice(bucket, sparse))
+            hubWrap.head.setSizes(Array(params.asInstanceOf[VectorBias].weights.length, 1))
+            hubWrap.asInstanceOf[Array[SerializableParameters]]
+          }
+        wrapped.toArray
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while extracting the divided VectorBias learning parameters.")
       }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParamSizes.length == 2 && pDesc.getParamSizes.tail.head == 1)
-    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
-    assert(weightArrays.size == 2)
-    VectorBias(BreezeDenseVector[Double](weightArrays.head), weightArrays.tail.head.head)
+    try {
+      val weightArrays: Array[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
+      VectorBias(BreezeDenseVector[Double](weightArrays.head), weightArrays.tail.head.head)
+    } catch {
+      case e: Throwable =>
+        e.printStackTrace()
+        throw new RuntimeException("Something happened while deserializing the VectorBias learning parameters.")
+    }
   }
 
 }

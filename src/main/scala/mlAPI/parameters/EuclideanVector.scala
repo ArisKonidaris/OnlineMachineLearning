@@ -2,6 +2,8 @@ package mlAPI.parameters
 
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
 import mlAPI.math.{DenseVector, SparseVector}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.utils.{WrappedVectoredParameters => wrappedParams}
 
 import scala.collection.mutable.ListBuffer
 
@@ -12,6 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends BreezeParameters {
 
   size = vector.length
+  sizes = Array(vector.length)
   bytes = getSize * 8
 
   def this() = this(BreezeDenseVector.zeros[Double](1))
@@ -24,9 +27,14 @@ case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends Breeze
 
   def this(breezeSparseVector: BreezeSparseVector[Double]) = this(breezeSparseVector.toDenseVector)
 
-  override def getSizes: Array[Int] = Array(vector.size)
-
   override def toString: String = s"EuclideanVector($vector)"
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case EuclideanVector(v) => vector.equals(v)
+      case _ => false
+    }
+  }
 
   override def +(num: Double): LearningParameters = EuclideanVector(vector + num)
 
@@ -91,33 +99,49 @@ case class EuclideanVector(var vector: BreezeDenseVector[Double]) extends Breeze
 
   override def flatten: BreezeDenseVector[Double] = vector
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par: Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, sparse: Boolean) =>
       try {
-        assert(par.length == 2 && lPar.isInstanceOf[EuclideanVector])
-        val sparse: Boolean = par.head.asInstanceOf[Boolean]
-        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        new SerializedVectoredParameters(
-          Array(lPar.asInstanceOf[EuclideanVector].vector.length),
-          lPar.asInstanceOf[EuclideanVector].slice(bucket, sparse)
+        assert(params.isInstanceOf[EuclideanVector])
+        val bucket: Bucket = Bucket(0, params.asInstanceOf[EuclideanVector].size - 1)
+        wrappedParams(
+          Array(params.asInstanceOf[EuclideanVector].vector.length),
+          null,
+          params.asInstanceOf[EuclideanVector].slice(bucket, sparse)
         )
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the EuclideanVector learning parameters.")
+          throw new RuntimeException("Something happened while extracting the EuclideanVector learning parameters.")
+      }
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
+      try {
+        assert(params.isInstanceOf[EuclideanVector] && args.length == 2)
+        val (sparse, quantiles) = extractSparseQuantiles(args)
+        val wrapped = ListBuffer[Array[SerializableParameters]]()
+        for (buckets: Array[Bucket] <- quantiles)
+          wrapped append {
+            val hubWrap = for (bucket: Bucket <- buckets)
+              yield wrappedParams(null, bucket, params.asInstanceOf[EuclideanVector].slice(bucket, sparse))
+            hubWrap.head.setSizes(Array(params.asInstanceOf[EuclideanVector].vector.length))
+            hubWrap.asInstanceOf[Array[SerializableParameters]]
+          }
+        wrapped.toArray
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while extracting the divided EuclideanVector learning parameters.")
       }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParamSizes.length == 1)
-    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
-    assert(weightArrays.size == 1)
-    EuclideanVector(BreezeDenseVector[Double](weightArrays.head))
-  }
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case EuclideanVector(v) => vector.equals(v)
-      case _ => false
+    try {
+      val weightArrays: Array[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
+      EuclideanVector(BreezeDenseVector[Double](weightArrays.head))
+    } catch {
+      case _: Throwable =>
+        throw new RuntimeException("Something happened while deserializing the EuclideanVector learning parameters.")
     }
   }
 

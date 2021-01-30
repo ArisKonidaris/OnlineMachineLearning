@@ -2,8 +2,9 @@ package mlAPI.learners
 
 import mlAPI.math.Breeze._
 import mlAPI.math.Point
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorBias}
+import mlAPI.parameters.{LearningParameters, VectorBias}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 
 import java.util
 import scala.collection.JavaConverters._
@@ -112,9 +113,25 @@ abstract class PassiveAggressiveLearners extends Learner {
     this
   }
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = {
+    if (weights == null)
+      new VectorBias().generateParameters
+    else
+      weights.generateParameters
+  }
 
-  override def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters =
-    new VectorBias().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    if (weights == null)
+      new VectorBias().extractParams
+    else
+      weights.extractParams
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    if (weights == null)
+      new VectorBias().extractDivParams
+    else
+      weights.extractDivParams
+  }
 
 }

@@ -26,7 +26,6 @@ case class DenseVector(var data: Array[Double]) extends Vector with Serializable
     */
   override def size: Int = data.length
 
-
   /**
     * Element wise access function
     *

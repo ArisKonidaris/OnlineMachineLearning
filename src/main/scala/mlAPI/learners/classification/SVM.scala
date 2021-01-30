@@ -4,9 +4,10 @@ import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.learners.Learner
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorBias}
+import mlAPI.parameters.{LearningParameters, VectorBias}
 import mlAPI.scores.Scores
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.utils.Parsing
 
 import scala.collection.JavaConverters._
@@ -179,10 +180,26 @@ case class SVM() extends Classifier with Serializable {
 
   override def toString: String = s"SVM classifier ${this.hashCode}"
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBias().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = {
+    if (weights == null)
+      new VectorBias().generateParameters
+    else
+      weights.generateParameters
+  }
 
-  override def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters =
-    new VectorBias().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    if (weights == null)
+      new VectorBias().extractParams
+    else
+      weights.extractParams
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    if (weights == null)
+      new VectorBias().extractDivParams
+    else
+      weights.extractDivParams
+  }
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("SVM",

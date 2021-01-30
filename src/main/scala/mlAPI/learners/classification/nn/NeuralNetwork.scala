@@ -2,10 +2,11 @@ package mlAPI.learners.classification.nn
 
 import ControlAPI.LearnerPOJO
 import org.nd4j.linalg.dataset.DataSet
-import mlAPI.learners.Learner
+import mlAPI.learners.{Learner, SGDUpdate}
 import mlAPI.learners.classification.Classifier
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.parameters.{DLParams, LearningParameters, ParameterDescriptor, SerializedParameters}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.{DLParams, LearningParameters}
 import mlAPI.utils.Parsing
 import org.deeplearning4j.datasets.iterator.impl.ListDataSetIterator
 import org.deeplearning4j.eval.Evaluation
@@ -35,14 +36,17 @@ import scala.collection.mutable
 case class NeuralNetwork(var conf: MultiLayerConfiguration,
                          var inputShape: Array[Int],
                          var numOfClasses: Int)
-  extends Classifier with Serializable {
+  extends Classifier with SGDUpdate with Serializable {
 
   override protected var miniBatchSize: Int = 64
   override protected val parallelizable: Boolean = true
   override protected var targetLabel: Double = 1.0
+  override var learningRate: Double = 0.001D
   private var parametersSize: Array[Int] = Array[Int]()
   private val batchX: ListBuffer[Double] = ListBuffer[Double]()
   private val batchY: ListBuffer[Double] = ListBuffer[Double]()
+  private val weights: DLParams = new DLParams()
+  private var u: INDArray = _
   var NN: MultiLayerNetwork = new MultiLayerNetwork(conf)
   NN.init()
 
@@ -62,6 +66,13 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     NN.setParams(Nd4j.create(sParams._1, sParams._2, sParams._3))
 
   def getParams: INDArray = NN.params()
+
+  override def getParameters: Option[LearningParameters] = Some(DLParams(NN.params()))
+
+  override def setParameters(params: LearningParameters): Learner = {
+    NN.setParams(params.asInstanceOf[DLParams].parameters)
+    this
+  }
 
   def getNN: Model = NN
 
@@ -113,13 +124,6 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
         labels ++ (for (i <- 0 to 9) yield { if (i * 1.0 == point.getLabel - 1.0) 1.0 else 0.0 }).toArray
       )
     }
-  }
-
-  override def getParameters: Option[LearningParameters] = Some(DLParams(NN.params()))
-
-  override def setParameters(params: LearningParameters): Learner = {
-    NN.setParams(params.asInstanceOf[DLParams].parameters)
-    this
   }
 
   override def predict(data: Point): Option[Double] = {
@@ -208,6 +212,11 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     } else 0.0D
   }
 
+  override def setLearningRate(lr: Double): Unit = {
+    super.setLearningRate(lr)
+    NN.setLearningRate(lr)
+  }
+
   override def setHyperParametersFromMap(hyperParameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((hyperparameter, value) <- hyperParameterMap) {
       hyperparameter match {
@@ -236,11 +245,14 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
               e.printStackTrace()
           }
         case "miniBatchSize" =>
+          miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 64)
+          println(miniBatchSize + " " + getMiniBatchSize)
+        case "learningRate" =>
           try {
-            miniBatchSize = Parsing.IntegerParsing(hyperParameterMap, "miniBatchSize", 64)
+            setLearningRate(Parsing.DoubleParsing(hyperParameterMap, "learningRate", 0.001D))
           } catch {
             case e: Exception =>
-              println("Error while trying to update the miniBatchSize hyper parameter of the Neural Network classifier.")
+              println("Error while trying to update the learningRate hyper parameter of the Neural Network classifier.")
               e.printStackTrace()
           }
         case "batchX" =>
@@ -305,10 +317,12 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     this
   }
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new DLParams().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = weights.generateParameters
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
-    new DLParams().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = weights.extractParams
+
+  override def extractDivParams: (LearningParameters , Array[_]) => Array[Array[SerializableParameters]] =
+    weights.extractDivParams
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("NN",

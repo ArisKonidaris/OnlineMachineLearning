@@ -1,14 +1,11 @@
 package mlAPI.parameters
 
-import ControlAPI.CountableSerial
-
-import java.io
 import mlAPI.learners.classification.trees.HoeffdingTree
 import mlAPI.learners.classification.trees.serializable.HTDescriptor
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters, WrappedStructuredParameters}
 
 case class HTParameters(ht: HoeffdingTree) extends LearningParameters {
 
-  size = 0
   bytes = {
     ht.calculateSize()
     ht.getSize
@@ -24,20 +21,25 @@ case class HTParameters(ht: HoeffdingTree) extends LearningParameters {
     })
   }
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par: Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, _: Boolean) =>
+      WrappedStructuredParameters(params.asInstanceOf[HTParameters].ht.serialize)
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
       try {
-        assert(lPar.isInstanceOf[HTParameters])
-        if (par != null)
-          if (par.length == 0)
-            lPar.asInstanceOf[HTParameters].ht.serialize
+        assert(params.isInstanceOf[HTParameters])
+        if (args != null)
+          if (args.length == 0)
+            Array(Array(utils.WrappedStructuredParameters(params.asInstanceOf[HTParameters].ht.serialize)))
           else
-            lPar.asInstanceOf[HTParameters].ht.serialize
+            Array(Array(utils.WrappedStructuredParameters(params.asInstanceOf[HTParameters].ht.serialize)))
         else
-          lPar.asInstanceOf[HTParameters].ht.serialize
+          Array(Array(utils.WrappedStructuredParameters(params.asInstanceOf[HTParameters].ht.serialize)))
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the HTParameters learning parameters.")
+          throw new RuntimeException("Something happened while extracting the HTParameters learning parameters.")
       }
   }
 
@@ -53,7 +55,11 @@ case class HTParameters(ht: HoeffdingTree) extends LearningParameters {
     }
   }
 
-  // TODO: Implement the equals method for the Hoeffding Tree parameters.
-  override def equals(obj: Any): Boolean = false
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case htp: HTParameters => ht.serialize.toString.equals(htp.ht.serialize.toString)
+      case _ => false
+    }
+  }
 
 }

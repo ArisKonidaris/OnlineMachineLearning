@@ -2,7 +2,8 @@ package mlAPI.learners
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Point
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, WithParams}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters, WithParams}
+import mlAPI.parameters.LearningParameters
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -82,7 +83,9 @@ trait Learner extends Serializable with WithParams {
 
   def generateParameters: ParameterDescriptor => LearningParameters
 
-  def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters
+  def extractParams: (LearningParameters, Boolean) => SerializableParameters
+
+  def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]]
 
   def generatePOJOLearner: LearnerPOJO
 

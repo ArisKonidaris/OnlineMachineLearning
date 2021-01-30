@@ -6,7 +6,8 @@ import mlAPI.learners.classification.trees.HoeffdingTree
 import mlAPI.learners.classification.trees.serializable.HTDescriptor
 import mlAPI.learners.Learner
 import mlAPI.math.{LabeledPoint, Point}
-import mlAPI.parameters.{HTParameters, LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.{HTParameters, LearningParameters}
 import mlAPI.scores.Scores
 import mlAPI.utils.Parsing
 
@@ -165,10 +166,12 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     this
   }
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new HTParameters().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = tree.generateParameters
 
-  override def getSerializedParams: (LearningParameters, Array[_]) => SerializedParameters =
-    tree.generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = tree.extractParams
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] =
+    tree.extractDivParams
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("HoeffdingTree",

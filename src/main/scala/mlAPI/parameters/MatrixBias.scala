@@ -1,6 +1,8 @@
 package mlAPI.parameters
 
 import breeze.linalg.{DenseMatrix => BreezeDenseMatrix, DenseVector => BreezeDenseVector}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.utils.{WrappedVectoredParameters => wrappedParams}
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,13 +15,17 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
   extends BreezeParameters {
 
   size = A.cols * A.rows + b.length
+  sizes = Array(A.size, b.size)
   bytes = 8 * size
 
   def this() = this(BreezeDenseMatrix.zeros(1, 1), BreezeDenseVector.zeros(1))
 
-  def this(weights: Array[Double]) = this()
-
-  override def getSizes: Array[Int] = Array(A.size, b.size)
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case MatrixBias(w, i) => b == i && A.equals(w)
+      case _ => false
+    }
+  }
 
   override def toString: String = s"MatrixBias([${A.rows}x${A.cols}], ${A.toDenseVector}, $b)"
 
@@ -90,34 +96,50 @@ case class MatrixBias(var A: BreezeDenseMatrix[Double], var b: BreezeDenseVector
 
   override def flatten: BreezeDenseVector[Double] = BreezeDenseVector.vertcat(A.toDenseVector, b)
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par: Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, sparse: Boolean) =>
       try {
-        assert(par.length == 2 && lPar.isInstanceOf[MatrixBias])
-        val sparse: Boolean = par.head.asInstanceOf[Boolean]
-        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        new SerializedVectoredParameters(
-          Array(lPar.asInstanceOf[MatrixBias].A.size, lPar.asInstanceOf[MatrixBias].b.size),
-          lPar.asInstanceOf[MatrixBias].slice(bucket, sparse)
+        assert(params.isInstanceOf[MatrixBias])
+        val bucket: Bucket = Bucket(0, params.asInstanceOf[MatrixBias].size - 1)
+        wrappedParams(
+          Array(params.asInstanceOf[MatrixBias].A.size, params.asInstanceOf[MatrixBias].b.size),
+          null,
+          params.asInstanceOf[MatrixBias].slice(bucket, sparse)
         )
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the MatrixBias learning parameters.")
+          throw new RuntimeException("Something happened while extracting the MatrixBias learning parameters.")
+      }
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
+      try {
+        assert(params.isInstanceOf[MatrixBias] && args.length == 2)
+        val (sparse, quantiles) = extractSparseQuantiles(args)
+        val wrapped = ListBuffer[Array[SerializableParameters]]()
+        for (buckets: Array[Bucket] <- quantiles)
+          wrapped append {
+            val hubWrap = for (bucket: Bucket <- buckets)
+              yield wrappedParams(null, bucket, params.asInstanceOf[MatrixBias].slice(bucket, sparse))
+            hubWrap.head.setSizes(Array(params.asInstanceOf[MatrixBias].A.size, params.asInstanceOf[MatrixBias].b.size))
+            hubWrap.asInstanceOf[Array[SerializableParameters]]
+          }
+        wrapped.toArray
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while extracting the divided MatrixBias learning parameters.")
       }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    require(pDesc.getParamSizes.length == 2)
-    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
-    assert(weightArrays.size == 2)
-    MatrixBias(BreezeDenseVector[Double](weightArrays.head).toDenseMatrix,
-      BreezeDenseVector[Double](weightArrays.tail.head))
-  }
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case MatrixBias(w, i) => b == i && A.equals(w)
-      case _ => false
+    try {
+      val weightArrays: Array[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
+      MatrixBias(BreezeDenseVector[Double](weightArrays.head).toDenseMatrix,
+        BreezeDenseVector[Double](weightArrays.tail.head))
+    } catch {
+      case _: Throwable =>
+        throw new RuntimeException("Something happened while deserializing the MatrixBias learning parameters.")
     }
   }
 

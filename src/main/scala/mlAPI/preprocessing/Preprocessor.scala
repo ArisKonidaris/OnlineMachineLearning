@@ -2,7 +2,7 @@ package mlAPI.preprocessing
 
 import ControlAPI.PreprocessorPOJO
 import mlAPI.math.Point
-import mlAPI.parameters.WithParams
+import mlAPI.parameters.utils.WithParams
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer

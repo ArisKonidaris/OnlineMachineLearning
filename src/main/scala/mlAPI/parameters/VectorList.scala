@@ -1,8 +1,9 @@
 package mlAPI.parameters
 
-import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, SparseVector, Vector}
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.utils.{WrappedVectoredParameters => wrappedParams}
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,6 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezeParameters {
 
   size = (for (vector: EuclideanVector <- vectors) yield vector.size).sum
+  sizes = (for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray
   bytes = 8 * (for (vector: EuclideanVector <- vectors) yield vector.bytes).sum
 
   def this() = this(ListBuffer[EuclideanVector](new EuclideanVector()))
@@ -57,8 +59,6 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
   }
 
   def this(breezeSparseVector: BreezeSparseVector[Double]) = this(breezeSparseVector.toDenseVector)
-
-  override def getSizes: Array[Int] = (for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray
 
   override def equals(obj: Any): Boolean = {
     obj match {
@@ -214,23 +214,49 @@ case class VectorList(var vectors: ListBuffer[EuclideanVector]) extends BreezePa
   override def flatten: BreezeDenseVector[Double] =
     (for (vector: EuclideanVector <- vectors) yield vector.flatten).reduce((x, y) => BreezeDenseVector.vertcat(x, y))
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par: Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, sparse: Boolean) =>
       try {
-        assert(par.length == 2 && lPar.isInstanceOf[VectorList])
-        val sparse: Boolean = par.head.asInstanceOf[Boolean]
-        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        new SerializedVectoredParameters(
+        assert(params.isInstanceOf[VectorList])
+        val bucket: Bucket = Bucket(0, params.asInstanceOf[VectorList].size - 1)
+        wrappedParams(
           (for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray,
-          lPar.asInstanceOf[VectorList].slice(bucket, sparse)
+          null,
+          params.asInstanceOf[VectorList].slice(bucket, sparse)
         )
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the VectorList learning parameters.")
+          throw new RuntimeException("Something happened while extracting the VectorList learning parameters.")
       }
   }
 
-  override def generateParameters(pDesc: ParameterDescriptor): LearningParameters =
-    new VectorList(unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data).toArray)
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
+      try {
+        assert(params.isInstanceOf[VectorList] && args.length == 2)
+        val (sparse, quantiles) = extractSparseQuantiles(args)
+        val wrapped = ListBuffer[Array[SerializableParameters]]()
+        for (buckets: Array[Bucket] <- quantiles)
+          wrapped append {
+            val hubWrap = for (bucket: Bucket <- buckets)
+              yield wrappedParams(null, bucket, params.asInstanceOf[VectorList].slice(bucket, sparse))
+            hubWrap.head.setSizes((for (vector: EuclideanVector <- vectors) yield vector.getSizes).flatten.toArray)
+            hubWrap.asInstanceOf[Array[SerializableParameters]]
+          }
+        wrapped.toArray
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while extracting the divided VectorList learning parameters.")
+      }
+  }
+
+  override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
+    try {
+      new VectorList(unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data))
+    } catch {
+      case _: Throwable =>
+        throw new RuntimeException("Something happened while deserializing the VectorList learning parameters.")
+    }
+  }
 
 }

@@ -4,8 +4,9 @@ import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
 import mlAPI.learners.Learner
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters, VectorBias, VectorBiasList}
+import mlAPI.parameters.{LearningParameters, VectorBias, VectorBiasList}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.scores.Scores
 import mlAPI.utils.Parsing
 
@@ -211,10 +212,26 @@ case class MultiClassPA() extends Classifier with Serializable {
 
   override def toString: String = s"MulticlassPA classifier ${this.hashCode}"
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new VectorBiasList().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = {
+    if (weights == null)
+      new VectorBiasList().generateParameters
+    else
+      weights.generateParameters
+  }
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
-    new VectorBiasList().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    if (weights == null)
+      new VectorBiasList().extractParams
+    else
+      weights.extractParams
+  }
+
+  override def extractDivParams: (LearningParameters , Array[_]) => Array[Array[SerializableParameters]] = {
+    if (weights == null)
+      new VectorBiasList().extractDivParams
+    else
+      weights.extractDivParams
+  }
 
   override def generatePOJOLearner: LearnerPOJO = {
     new LearnerPOJO("MulticlassPA",

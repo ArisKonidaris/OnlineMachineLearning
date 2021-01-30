@@ -1,8 +1,9 @@
 package mlAPI.parameters
 
-import ControlAPI.CountableSerial
 import mlAPI.math.{DenseVector, SparseVector}
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, SerializableParameters}
+import mlAPI.parameters.utils.{WrappedVectoredParameters => wrappedParams}
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,6 +14,7 @@ import scala.collection.mutable.ListBuffer
 case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends BreezeParameters {
 
   size = (for (vectorBias: VectorBias <- vectorBiases) yield vectorBias.size).sum
+  sizes = (for (weights: VectorBias <- vectorBiases) yield weights.getSizes).flatten.toArray
   bytes = 8 * (for (vectorBias: VectorBias <- vectorBiases) yield vectorBias.bytes).sum
 
   def this() = this(ListBuffer[VectorBias](new VectorBias()))
@@ -58,8 +60,6 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
 
   def this(breezeSparseVector: BreezeSparseVector[Double]) = this(breezeSparseVector.toDenseVector)
 
-  override def getSizes: Array[Int] = (for (weights: VectorBias <- vectorBiases) yield weights.getSizes).flatten.toArray
-
   override def equals(obj: Any): Boolean = {
     obj match {
       case VectorBiasList(vbs: ListBuffer[VectorBias]) =>
@@ -81,7 +81,7 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
   }
 
   def +(index: Int, num: Double): LearningParameters = {
-    require(index <= vectorBiases.size - 1)
+    checkIndex(index)
     VectorBiasList(
       for ((weights: VectorBias, i: Int) <- vectorBiases.zipWithIndex)
         yield (if (i != index) weights else weights + num).asInstanceOf[VectorBias]
@@ -114,7 +114,7 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
   }
 
   def +(index: Int, params: VectorBias): LearningParameters = {
-    require(index <= vectorBiases.size - 1)
+    checkIndex(index)
     VectorBiasList(
       for ((weights: VectorBias, i: Int) <- vectorBiases.zipWithIndex)
         yield (if (i != index) weights else weights + params).asInstanceOf[VectorBias]
@@ -213,25 +213,51 @@ case class VectorBiasList(var vectorBiases: ListBuffer[VectorBias]) extends Bree
   override def flatten: BreezeDenseVector[Double] =
     (for (weights: VectorBias <- vectorBiases) yield weights.flatten).reduce((x, y) => BreezeDenseVector.vertcat(x, y))
 
-  override def generateSerializedParams: (LearningParameters, Array[_]) => SerializedParameters = {
-    (lPar: LearningParameters, par : Array[_]) =>
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    (params: LearningParameters, sparse : Boolean) =>
       try {
-        assert(par.length == 2 && lPar.isInstanceOf[VectorBiasList])
-        val sparse: Boolean = par.head.asInstanceOf[Boolean]
-        val bucket: Bucket = par.tail.head.asInstanceOf[Bucket]
-        new SerializedVectoredParameters(
+        assert(params.isInstanceOf[VectorBiasList])
+        wrappedParams(
           (for (weights: VectorBias <- vectorBiases) yield weights.getSizes).flatten.toArray,
-          lPar.asInstanceOf[VectorBiasList].slice(bucket, sparse)
+          null,
+          params.asInstanceOf[VectorBiasList].slice(Bucket(0, params.asInstanceOf[VectorBiasList].size - 1), sparse)
         )
       } catch {
         case _: Throwable =>
-          throw new RuntimeException("Something happened while Serializing the VectorBiasList learning parameters.")
+          throw new RuntimeException("Something happened while extracting the VectorBiasList learning parameters.")
+      }
+  }
+
+  override def extractDivParams: (LearningParameters, Array[_]) => Array[Array[SerializableParameters]] = {
+    (params: LearningParameters, args: Array[_]) =>
+      try {
+        assert(params.isInstanceOf[VectorBiasList] && args.length == 2)
+        val (sparse, quantiles) = extractSparseQuantiles(args)
+        val wrapped = ListBuffer[Array[SerializableParameters]]()
+        for (buckets: Array[Bucket] <- quantiles)
+          wrapped append {
+            val hubWrap = for (bucket: Bucket <- buckets)
+              yield wrappedParams(null, bucket, params.asInstanceOf[VectorBiasList].slice(bucket, sparse))
+            hubWrap.head.setSizes((for (weights: VectorBias <- vectorBiases) yield weights.getSizes).flatten.toArray)
+            hubWrap.asInstanceOf[Array[SerializableParameters]]
+          }
+        wrapped.toArray
+      } catch {
+        case _: Throwable =>
+          throw new RuntimeException("Something happened while extracting the divided VectorBiasList learning parameters.")
       }
   }
 
   override def generateParameters(pDesc: ParameterDescriptor): LearningParameters = {
-    val weightArrays: ListBuffer[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
-    new VectorBiasList((for ((e, i) <- weightArrays.zipWithIndex if i % 2 == 0) yield e ++ weightArrays(i + 1)).toArray)
+    try {
+      val weightArrays: Array[Array[Double]] = unwrapData(pDesc.getParamSizes, toDense(pDesc.getParams).data)
+      new VectorBiasList(for ((e, i) <- weightArrays.zipWithIndex if i % 2 == 0) yield e ++ weightArrays(i + 1))
+    } catch {
+      case _: Throwable =>
+        throw new RuntimeException("Something happened while deserializing the VectorBiasList learning parameters.")
+    }
   }
+
+  def checkIndex(index: Int): Unit = require(index <= vectorBiases.size - 1)
 
 }

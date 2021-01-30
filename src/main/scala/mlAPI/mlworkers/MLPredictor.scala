@@ -1,90 +1,32 @@
 package mlAPI.mlworkers
 
-import BipartiteTopologyAPI.NodeInstance
-import BipartiteTopologyAPI.annotations.{DefaultOp, InitOp, MergeOp, ProcessOp, QueryOp}
-import ControlAPI.{DataInstance, Prediction, Request}
-import mlAPI.math.{DenseVector, SparseVector, UnlabeledPoint, Vector}
-import mlAPI.pipelines.MLPipeline
+import BipartiteTopologyAPI.annotations.{InitOp, ProcessOp, QueryOp}
+import ControlAPI.{DataInstance, Prediction}
+import mlAPI.math.{DenseVector, Point, UnlabeledPoint, Vector}
 import mlAPI.mlworkers.interfaces.MLPredictorRemote
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor}
-import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
+import mlAPI.mlworkers.worker.VectoredWorker
+import mlAPI.parameters.utils.ParameterDescriptor
+import mlAPI.protocols.IntWrapper
+import mlAPI.protocols.periodic.{PushPull, RemoteLearner}
 
-import scala.collection.mutable
 import scala.collection.JavaConverters._
 
 /**
  * An ML predictor.
  */
-class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with RemoteLearner {
-
-  /** A TreeMap with the parameter splits. */
-  protected var parameter_tree: mutable.TreeMap[(Int, Int), Vector] = _
-
-  /** The local machine learning pipeline predictor */
-  protected var ml_pipeline: MLPipeline = new MLPipeline()
-
-  // =================================== Getters ===================================================
-
-  def getMLPipeline: MLPipeline = ml_pipeline
-
-  def getLearnerParams: Option[LearningParameters] = ml_pipeline.getLearner.getParameters
-
-  // =================================== Setters ===================================================
-
-  def setMLPipeline(ml_pipeline: MLPipeline): Unit = this.ml_pipeline = ml_pipeline
-
-  def setLearnerParams(params: LearningParameters): Unit = ml_pipeline.getLearner.setParameters(params)
-
-  // =================================== Periodic ML workers basic operations =======================
-
-  /** This method configures an Online Machine Learning predictor by using a creation Request.
-   *
-   * @param request The creation request provided.
-   * @return An [[MLPredictor]] instance.
-   */
-  def configureWorker(request: Request): MLPredictor = {
-
-    // Setting the ML node parameters
-    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
-    if (config == null) throw new RuntimeException("Empty configuration map.")
-
-    // Setting the ML pipeline
-    ml_pipeline.configureMLPipeline(request)
-
-    this
-  }
-
-  /** Clear the Machine Learning predictor. */
-  def clear(): MLPredictor = {
-    ml_pipeline.clear()
-    this
-  }
+class MLPredictor(override protected var maxMsgParams: Int = 10000)
+  extends VectoredWorker[PushPull, MLPredictorRemote] with RemoteLearner {
 
   /** Initialization method of the Machine Learning predictor node. */
   @InitOp
-  def init(): Unit = {
+  def init(): Unit = setWarmed(true)
 
-  }
-
-  /** A method called when merging two ML predictors.
+  /** This method responds to a query for the Machine Learning worker.
    *
-   * @param predictors The ML predictors to merge this one with.
-   * @return An [[MLPredictor]] instance.
-   */
-  @MergeOp
-  def merge(predictors: Array[MLPredictor]): MLPredictor = {
-    for (predictor <- predictors) ml_pipeline.merge(predictor.getMLPipeline)
-    this
-  }
-
-  /** This method responds to a query for the Machine Learning predictor.
-   *
-   * @param test_set The test set that the predictive performance of the model should be calculated on.
+   * @param predicates The predicated of the query.
    */
   @QueryOp
-  def query(queryId: Long, queryTarget: Int, test_set: Array[java.io.Serializable]): Unit = {
-
-  }
+  def query(queryId: Long, queryTarget: Int, predicates: (Double, Array[Point])): Unit = ()
 
   /** The data point to be predicted.
    *
@@ -112,7 +54,7 @@ class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with Remot
     val unlabeledPoint = UnlabeledPoint(features._1, features._2, features._3)
 
     val prediction = {
-      ml_pipeline.predict(unlabeledPoint) match {
+      mlPipeline.predict(unlabeledPoint) match {
         case Some(prediction: Double) => prediction
         case None => Double.MaxValue
       }
@@ -122,32 +64,41 @@ class MLPredictor() extends NodeInstance[PullPush, MLPredictorRemote] with Remot
 
   }
 
-  /** A method called each type the new global model
-   * (or a slice of it) arrives from the parameter server.
+  /**
+   * A method called each type the new global model
+   * (or a slice of it) arrives from a parameter server.
    */
-  @DefaultOp
-  def updateModel(mDesc: ParameterDescriptor): Unit = {
-    if (getNumberOfHubs == 1) {
-      ml_pipeline.getLearner.setParameters(ml_pipeline.getLearner.generateParameters(mDesc).getCopy)
-    } else {
-      parameter_tree.put((mDesc.getBucket.getStart.toInt, mDesc.getBucket.getEnd.toInt), mDesc.getParams)
-      if (parameter_tree.size == getNumberOfHubs) {
-        mDesc.setParams(
-          DenseVector(
-            parameter_tree.values
-              .map(
-                {
-                  case dense: DenseVector => dense
-                  case sparse: SparseVector => sparse.toDenseVector
-                })
-              .fold(Array[Double]())(
-                (accum, vector) => accum.asInstanceOf[Array[Double]] ++ vector.asInstanceOf[DenseVector].data)
-              .asInstanceOf[Array[Double]]
-          )
-        )
-        ml_pipeline.getLearner.setParameters(ml_pipeline.getLearner.generateParameters(mDesc).getCopy)
+  override def updateModel(mDesc: ParameterDescriptor): Unit = {
+    try {
+      val spt: Int = {
+        try {
+          splits(getCurrentCaller)
+        } catch {
+          case _: Throwable =>
+            assert(mDesc.getMiscellaneous != null, mDesc.getMiscellaneous.head.isInstanceOf[IntWrapper])
+            splits.put(getCurrentCaller, mDesc.getMiscellaneous.head.asInstanceOf[IntWrapper].getInt)
+            splits(getCurrentCaller)
+        }
       }
+      if (getNumberOfHubs == 1)
+        if (spt == 1)
+          updateModels(mDesc)
+        else
+          updateParameterTree(spt, mDesc, updateModels)
+      else
+        updateParameterTree(spt, mDesc, updateModels)
+    } catch {
+      case e: Throwable =>
+        e.printStackTrace()
+        throw new RuntimeException("Something went wrong while updating the local predictor " +
+          getNodeId + " of MLPipeline " + getNetworkID + ".")
     }
+  }
+
+  override def updateModels(mDesc: ParameterDescriptor): Unit = {
+    if (mDesc.getParamSizes == null)
+      mDesc.setParamSizes(mlPipeline.getLearner.getParameters.get.sizes)
+    setMLPipelineParams(mDesc)
   }
 
 }

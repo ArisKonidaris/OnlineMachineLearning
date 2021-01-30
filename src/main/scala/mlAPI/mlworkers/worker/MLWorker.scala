@@ -5,7 +5,8 @@ import BipartiteTopologyAPI.NodeInstance
 import BipartiteTopologyAPI.annotations.MergeOp
 import mlAPI.math.Point
 import mlAPI.pipelines.MLPipeline
-import mlAPI.parameters.{LearningParameters, ParameterDescriptor}
+import mlAPI.parameters.LearningParameters
+import mlAPI.parameters.utils.ParameterDescriptor
 import mlAPI.utils.Parsing
 
 import scala.collection.mutable
@@ -16,6 +17,7 @@ import scala.collection.mutable.ListBuffer
  *
  * @tparam ProxyIfc The remote interface of the Parameter Server.
  * @tparam QueryIfc The remote interface of the querier.
+ * @param maxMsgParams The maximum number of parameters that can be transmitted in a single message over the network.
  */
 abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, QueryIfc] {
 
@@ -39,6 +41,12 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   /** The global model. */
   protected var globalModel: MLPipeline = new MLPipeline()
 
+  /** A flag determining if the local worker is warmed up. */
+  private var warmed: Boolean = false
+
+  /** The maximum number of parameters that can be transmitted over the network. */
+  protected var maxMsgParams: Int
+
   // =============================================== Getters ===========================================================
 
   def getProtocol: String = protocol
@@ -58,6 +66,10 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def getGlobalModel: MLPipeline = globalModel
 
   def getGlobalParams: Option[LearningParameters] = globalModel.getLearner.getParameters
+
+  def getMaxMsgParams: Int = maxMsgParams
+
+  def isWarmedUp: Boolean = warmed
 
   // =============================================== Setters ===========================================================
 
@@ -83,6 +95,9 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
   def setGlobalModelParams(mDesc: ParameterDescriptor): Unit = setGlobalModelParams(deserializeParams(mDesc))
 
+  def setMaxMsgParams(maxMsgParams: Int): Unit = this.maxMsgParams = maxMsgParams
+
+  def setWarmed(warmed: Boolean): Unit = this.warmed = warmed
 
   // ======================================== ML worker basic operations ===============================================
 
@@ -119,6 +134,13 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
     if (config.contains("warmupSize"))
       try {
         setWarmupSize(Parsing.IntegerParsing(config, "warmupSize", 256))
+      } catch {
+        case e: Throwable => e.printStackTrace()
+      }
+
+    if (config.contains("maxMsgParams"))
+      try {
+        setMaxMsgParams(Parsing.IntegerParsing(config, "maxMsgParams", 10000))
       } catch {
         case e: Throwable => e.printStackTrace()
       }
@@ -178,24 +200,26 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def getGlobalPerformance(testSet: ListBuffer[Point]): Double = globalModel.score(testSet)
 
   /** Converts the model into a Serializable POJO case class to be send over the Network. */
-  def ModelMarshalling(sparse: Boolean, drift: Boolean): Array[ParameterDescriptor]
+  def ModelMarshalling(sparse: Boolean, warm: Boolean, model: LearningParameters): Array[Array[ParameterDescriptor]]
 
   /** A method for deserializing the parameters received by the coordinaor. */
   def deserializeParams(mDesc: ParameterDescriptor): LearningParameters = mlPipeline.getLearner.generateParameters(mDesc)
 
-  /** A method for updating the global model. */
-  def updateGlobalModel(mDesc: ParameterDescriptor): Unit = {
+  /** A method for updating the local and global machine learning models. */
+  def updateModels(mDesc: ParameterDescriptor): Unit = {
+    if (mDesc.getParamSizes == null)
+      mDesc.setParamSizes(getMLPipeline.getLearner.getParameters.get.sizes)
     setGlobalModelParams(mDesc)
-    if (globalModel.getFittedData < mDesc.getFitted)
-      globalModel.setFittedData(mDesc.getFitted)
+    setMLPipelineParams(getGlobalParams.get.getCopy)
   }
 
-  /** A method for updating the local machine learning model. */
-  def updateLocalModel(mDesc: ParameterDescriptor): Unit = {
-    updateGlobalModel(mDesc)
-    setMLPipelineParams(getGlobalParams.get.getCopy)
-    if (mlPipeline.getFittedData < mDesc.getFitted)
-      mlPipeline.setFittedData(mDesc.getFitted)
+  def warmModel(mDesc: ParameterDescriptor): Unit = {
+    assert(!warmed)
+    warmed = true
+    setGlobalModelParams(mDesc)
+    setMLPipelineParams(mDesc)
+    assert(isBlocked)
+    unblockStream()
   }
 
 }

@@ -4,12 +4,13 @@ import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.math.{LabeledPoint, Point}
 import mlAPI.learners.Learner
-import mlAPI.parameters.{LearningParameters, MatrixBias, ParameterDescriptor, SerializedParameters, SerializedVectoredParameters}
+import mlAPI.parameters.{LearningParameters, MatrixBias}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
 import breeze.linalg.{DenseVector => BreezeDenseVector, _}
+import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.scores.Scores
 import mlAPI.utils.Parsing
 
@@ -58,7 +59,7 @@ case class ORR() extends Regressor with Serializable {
   override def fitLoss(data: Point): Double = {
     val loss: Double =
       Math.pow(data.asInstanceOf[LabeledPoint].label - predict(data).get, 2) +
-        lambda * Math.pow(weights.FrobeniusNorm, 2)
+        lambda * Math.pow(weights.frobeniusNorm, 2)
     fit(data: Point)
     loss
   }
@@ -171,9 +172,25 @@ case class ORR() extends Regressor with Serializable {
     )
   }
 
-  override def generateParameters: ParameterDescriptor => LearningParameters = new MatrixBias().generateParameters
+  override def generateParameters: ParameterDescriptor => LearningParameters = {
+    if (weights == null)
+      new MatrixBias().generateParameters
+    else
+      weights.generateParameters
+  }
 
-  override def getSerializedParams: (LearningParameters , Array[_]) => SerializedParameters =
-    new MatrixBias().generateSerializedParams
+  override def extractParams: (LearningParameters, Boolean) => SerializableParameters = {
+    if (weights == null)
+      new MatrixBias().extractParams
+    else
+      weights.extractParams
+  }
+
+  override def extractDivParams: (LearningParameters , Array[_]) => Array[Array[SerializableParameters]] = {
+    if (weights == null)
+      new MatrixBias().extractDivParams
+    else
+      weights.extractDivParams
+  }
 
 }

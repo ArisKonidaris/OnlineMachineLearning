@@ -2,8 +2,7 @@ package mlAPI.mlParameterServers
 
 import BipartiteTopologyAPI.NodeInstance
 import ControlAPI.Request
-import mlAPI.parameters.ParameterDescriptor
-import mlAPI.protocols.ProtocolStatistics
+import mlAPI.protocols.statistics.{AsynchronousStatistics, ProtocolStatistics}
 
 /**
  * An abstract base class of a Machine Learning Parameter Server.
@@ -11,10 +10,11 @@ import mlAPI.protocols.ProtocolStatistics
  * @tparam WorkerIfc The remote interface of the Machine Learning worker.
  * @tparam QueryIfc  The remote interface of the querier.
  */
-abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[WorkerIfc, QueryIfc] {
+abstract class MLParameterServer[WorkerIfc, QueryIfc](protected var maxMsgParams: Int = 10000)
+  extends NodeInstance[WorkerIfc, QueryIfc] {
 
   /** An object holding the statistics of the distributed training procedure. */
-  var protocolStatistics: ProtocolStatistics = _
+  protected var protocolStatistics: ProtocolStatistics = AsynchronousStatistics()
 
   /**
    * The cumulative loss of the distributed Machine Learning training.
@@ -26,31 +26,28 @@ abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[Worke
    */
   protected var fitted: Long = 0L
 
-  /**
-   * The range of parameters that the current parameter server is responsible for.
-   */
-  protected var parametersDescription: ParameterDescriptor = _
-
   // ================================================= Getters =========================================================
+
+  def getProtocolStatistics: ProtocolStatistics = {
+    val value = protocolStatistics
+    value
+  }
 
   def getCumulativeLoss: Double = cumulativeLoss
 
   def getNumberOfFittedData: Long = fitted
 
-  def getParameterRange: ParameterDescriptor = parametersDescription
-
-  def getProtocolStatistics: ProtocolStatistics = protocolStatistics
+  def getMaxMsgParams: Int = maxMsgParams
 
   // ================================================= Setters =========================================================
+
+  def setProtocolStatistics(protocolStatistics: ProtocolStatistics): Unit = this.protocolStatistics = protocolStatistics
 
   def setCumulativeLoss(cumulativeLoss: Double): Unit = this.cumulativeLoss = cumulativeLoss
 
   def setNumberOfFittedData(fitted: Long): Unit = this.fitted = fitted
 
-  def setParameterRange(parametersDescription: ParameterDescriptor): Unit =
-    this.parametersDescription = parametersDescription
-
-  def setProtocolStatistics(protocolStatistics: ProtocolStatistics): Unit = this.protocolStatistics = protocolStatistics
+  def setMaxMsgParams(maxMsgParams: Int): Unit = this.maxMsgParams = maxMsgParams
 
   // ============================== Machine Learning Parameter Server Basic Operations =================================
 
@@ -66,9 +63,9 @@ abstract class MLParameterServer[WorkerIfc, QueryIfc] extends NodeInstance[Worke
 
   /** A method called when the Parameter Server needs to be cleared. */
   def clear(): MLParameterServer[WorkerIfc, QueryIfc] = {
+    protocolStatistics.clear()
     cumulativeLoss = 0D
     fitted = 0L
-    parametersDescription = null
     this
   }
 

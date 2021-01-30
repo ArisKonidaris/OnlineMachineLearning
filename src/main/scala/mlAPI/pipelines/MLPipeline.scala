@@ -7,8 +7,10 @@ import mlAPI.learners.Learner
 import mlAPI.learners.classification.nn.NeuralNetwork
 import mlAPI.learners.classification.{MultiClassPA, PA, SVM}
 import mlAPI.learners.regression.{ORR, RegressorPA}
-import mlAPI.parameters.{Bucket, HTParameters, ParameterDescriptor, VectoredParameters, WithParams}
+import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, WithParams, WrappedVectoredParameters}
+import mlAPI.parameters.{HTParameters, VectoredParameters}
 import mlAPI.preprocessing.{MinMaxScaler, PolynomialFeatures, Preprocessor, RunningMean, StandardScaler}
+import mlAPI.protocols.LongWrapper
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -147,7 +149,8 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
 
     try {
       val lContainer: POJOLearner = request.getLearner
-      if (lContainer != null) addLearner(createLearner(lContainer))
+      if (lContainer != null)
+        addLearner(createLearner(lContainer))
     } catch {
       case _: java.lang.NullPointerException =>
       case other: Throwable => other.printStackTrace()
@@ -233,32 +236,28 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     if (learner != null && learner.getParameters.isDefined) {
       getLearner.getParameters.get match {
         case _: VectoredParameters =>
-          val (sizes, parameters) = {
-            getLearner
-              .getSerializedParams(
-                getLearner.getParameters.get,
-                Array(false, Bucket(0, getLearner.getParameters.get.getSize - 1))
-              ).asInstanceOf[(Array[Int], Vector)]
-          }
+          val wrapped = getLearner.extractParams(getLearner.getParameters.get, false)
+            .asInstanceOf[WrappedVectoredParameters]
           ParameterDescriptor(
-            sizes,
-            parameters,
+            wrapped.getSizes,
+            wrapped.getData,
             Bucket(0, getLearner.getParameters.get.getSize - 1),
             null,
             null,
-            fittedData
+            LongWrapper(fittedData)
           )
         case _: HTParameters =>
           ParameterDescriptor(
             null,
             null,
             null,
-            getLearner.getSerializedParams(getLearner.getParameters.get, null),
+            getLearner.extractParams(getLearner.getParameters.get, false),
             null,
-            fittedData
+            LongWrapper(fittedData)
           )
       }
-    } else new ParameterDescriptor()
+    } else
+      new ParameterDescriptor()
   }
 
   def generatePOJO: (List[POJOPreprocessor], POJOLearner, Long, Double, Double) = {

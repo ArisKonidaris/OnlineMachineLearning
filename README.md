@@ -1,4 +1,4 @@
-# Online_Machine_Learning_via_Flink
+# Online Machine Learning via Flink
 
 Distributed High Scale Online Machine Learning via Apache Flink.
 
