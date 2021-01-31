@@ -1,6 +1,6 @@
 package mlAPI.preprocessing
 
-import mlAPI.math.Point
+import mlAPI.math.LearningPoint
 
 import scala.collection.mutable.ListBuffer
 
@@ -8,7 +8,7 @@ abstract class learningPreprocessor extends Preprocessor {
 
   protected var learnable: Boolean = true
 
-  def init(point: Point): Unit
+  def init(point: LearningPoint): Unit
 
   def isLearning: Boolean = learnable
 
@@ -16,7 +16,7 @@ abstract class learningPreprocessor extends Preprocessor {
 
   def enableLearning(): Unit = learnable = true
 
-  def fit(point: Point): Unit
+  def fit(point: LearningPoint): Unit
 
-  def fit(dataSet: ListBuffer[Point]): Unit
+  def fit(dataSet: ListBuffer[LearningPoint]): Unit
 }

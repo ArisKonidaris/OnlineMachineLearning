@@ -4,7 +4,7 @@ import ControlAPI.PreprocessorPOJO
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import breeze.numerics.sqrt
 import mlAPI.math.Breeze._
-import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint, Vector}
+import mlAPI.math.{LabeledPoint, LearningPoint, UnlabeledPoint, Vector}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -16,13 +16,13 @@ case class StandardScaler() extends learningPreprocessor {
   private var d_squared: BreezeDenseVector[Double] = _
   private var count: Long = _
 
-  override def init(point: Point): Unit = {
+  override def init(point: LearningPoint): Unit = {
     mean = BreezeDenseVector.zeros[Double](point.getNumericVector.size)
     d_squared = BreezeDenseVector.zeros[Double](point.getNumericVector.size)
     count = 0L
   }
 
-  override def fit(point: Point): Unit = {
+  override def fit(point: LearningPoint): Unit = {
     try {
       count += 1
       val newMean = mean + (1 / (1.0 * count)) * (point.getNumericVector.asBreeze - mean)
@@ -35,30 +35,36 @@ case class StandardScaler() extends learningPreprocessor {
     }
   }
 
-  override def fit(dataSet: ListBuffer[Point]): Unit = for (point <- dataSet) if (count < Long.MaxValue) fit(point)
+  override def fit(dataSet: ListBuffer[LearningPoint]): Unit = for (point <- dataSet) if (count < Long.MaxValue) fit(point)
 
-  override def transform(point: Point): Point = {
+  override def transform(point: LearningPoint): LearningPoint = {
     if (isLearning) if (count == Long.MaxValue) freezeLearning() else fit(point)
     matchTransform(point)
   }
 
-  override def transform(dataSet: ListBuffer[Point]): ListBuffer[Point] = {
+  override def transform(dataSet: ListBuffer[LearningPoint]): ListBuffer[LearningPoint] = {
     if (isLearning) if (count == Long.MaxValue) freezeLearning() else fit(dataSet)
-    val transformedBuffer = ListBuffer[Point]()
+    val transformedBuffer = ListBuffer[LearningPoint]()
     for (point <- dataSet) transformedBuffer.append(matchTransform(point))
     transformedBuffer
   }
 
-  private def matchTransform(point: Point): Point = {
+  private def matchTransform(point: LearningPoint): LearningPoint = {
     point match {
-      case UnlabeledPoint(_, _, _) =>
-        if (count > 1) UnlabeledPoint(scale(point), DenseVector(), Array[String]()) else point
-      case LabeledPoint(label, _, _, _) =>
-        if (count > 1) LabeledPoint(label, scale(point), DenseVector(), Array[String]()) else point
+      case UnlabeledPoint(_, dv, cv, di) =>
+        if (count > 1)
+          UnlabeledPoint(scale(point), dv, cv, di)
+        else
+          point
+      case LabeledPoint(label, _, dv, cv, di) =>
+        if (count > 1)
+          LabeledPoint(label, scale(point), dv, cv, di)
+        else
+          point
     }
   }
 
-  private def scale(point: Point): Vector =
+  private def scale(point: LearningPoint): Vector =
     ((point.getNumericVector.asBreeze - mean) / sqrt((1.0 / count) * d_squared)).fromBreeze
 
   def getMean: BreezeDenseVector[Double] = mean

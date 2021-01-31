@@ -3,7 +3,7 @@ package mlAPI.scores
 import mlAPI.learners.classification.Classifier
 import mlAPI.learners.clustering.Clusterer
 import mlAPI.learners.regression.Regressor
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint, Point}
 
 import scala.collection.mutable.ListBuffer
 
@@ -86,7 +86,7 @@ object Scores {
     }
   }
 
-  def inertia(testSet: ListBuffer[Point], learner: Clusterer): Double = {
+  def inertia(testSet: ListBuffer[LearningPoint], learner: Clusterer): Double = {
     if (testSet.nonEmpty) {
       @scala.annotation.tailrec
       def accumulateLoss(index: Int, loss: Double): Double = {

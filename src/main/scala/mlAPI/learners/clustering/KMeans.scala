@@ -2,7 +2,7 @@ package mlAPI.learners.clustering
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{DenseVector, Point, UnlabeledPoint}
+import mlAPI.math.{DenseVector, LearningPoint, Point, UnlabeledPoint}
 import mlAPI.learners.Learner
 import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.parameters.{EuclideanVector, LearningParameters, VectorList}
@@ -29,16 +29,16 @@ case class KMeans() extends Clusterer with Serializable {
   private var trainingMethod: String = "forgetful"
   private var graceInit: Int = 10
   private var step: Double = 0.01
-  private var initFeatures: ListBuffer[Point] = ListBuffer[Point]()
+  private var initFeatures: ListBuffer[LearningPoint] = ListBuffer[LearningPoint]()
 
-  override def initializeModel(data: Point): Learner = {
+  override def initializeModel(data: LearningPoint): Learner = {
     require(data.isInstanceOf[UnlabeledPoint])
     initFeatures.append(data.asInstanceOf[UnlabeledPoint])
     if (initFeatures.size >= graceInit * nClusters) initCentroids()
     this
   }
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     val dist: Array[Double] = distribution(data)
     if (!dist.isEmpty)
       Some(dist.zipWithIndex.min._2.toDouble)
@@ -46,19 +46,19 @@ case class KMeans() extends Clusterer with Serializable {
       None
   }
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)
     predictions.toArray
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     fitLoss(data)
     ()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     var loss: Double = 0D
     val dist: Array[Double] = distribution(data)
     if (!dist.isEmpty) {
@@ -76,16 +76,16 @@ case class KMeans() extends Clusterer with Serializable {
     loss
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(test_set: ListBuffer[Point]): Double = Scores.inertia(test_set, this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double = Scores.inertia(testSet, this)
 
-  override def distribution(data: Point): Array[Double] = {
+  override def distribution(data: LearningPoint): Array[Double] = {
     if (this.counts != null && this.centroids != null) {
       (for (centroid: EuclideanVector <- centroids.vectors)
         yield breeze.linalg.functions.euclideanDistance(data.getNumericVector.asBreeze, centroid.vector)).toArray
@@ -191,7 +191,7 @@ case class KMeans() extends Clusterer with Serializable {
         s"hyper parameter of KMeans clusterer. Valid values: The real (0.0, 1.0) interval.")
   }
 
-  def setInitFeatures(initFeatures: ListBuffer[Point]): Unit = this.initFeatures = initFeatures
+  def setInitFeatures(initFeatures: ListBuffer[LearningPoint]): Unit = this.initFeatures = initFeatures
 
   override def setParametersFromMap(parameterMap: mutable.Map[String, AnyRef]): Learner = {
     for ((parameter, value) <- parameterMap) {
@@ -225,9 +225,9 @@ case class KMeans() extends Clusterer with Serializable {
           }
         case "initFeatures" =>
           try {
-            val pl: ListBuffer[Point] = ListBuffer[Point]()
+            val pl: ListBuffer[LearningPoint] = ListBuffer[LearningPoint]()
             for (v: java.util.List[Double] <- value.asInstanceOf[java.util.List[java.util.List[Double]]].asScala)
-              pl.append(UnlabeledPoint(DenseVector(v.asScala.toArray), DenseVector(), Array[String]()))
+              pl.append(UnlabeledPoint(DenseVector(v.asScala.toArray), DenseVector(), Array[String](), null))
             initFeatures = pl
           } catch {
             case e: Exception =>

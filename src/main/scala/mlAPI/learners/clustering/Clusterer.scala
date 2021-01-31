@@ -1,10 +1,10 @@
 package mlAPI.learners.clustering
 
 import mlAPI.learners.Learner
-import mlAPI.math.Point
+import mlAPI.math.LearningPoint
 
 trait Clusterer extends Learner {
 
-  def distribution(data: Point): Array[Double]
+  def distribution(data: LearningPoint): Array[Double]
 
 }

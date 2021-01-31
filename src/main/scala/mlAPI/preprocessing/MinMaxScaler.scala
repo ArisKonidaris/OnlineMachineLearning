@@ -1,7 +1,7 @@
 package mlAPI.preprocessing
 
 import ControlAPI.PreprocessorPOJO
-import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint, Vector}
+import mlAPI.math.{DenseVector, LabeledPoint, LearningPoint, UnlabeledPoint, Vector}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
 import scala.collection.mutable.ListBuffer
@@ -32,22 +32,22 @@ case class MinMaxScaler(private var min: BreezeDenseVector[Double] = BreezeDense
 
   def setMax(max: BreezeDenseVector[Double]): Unit = this.max = max
 
-  override def transform(point: Point): Point = {
+  override def transform(point: LearningPoint): LearningPoint = {
     point match {
-      case UnlabeledPoint(_, _, _) => UnlabeledPoint(scale(point), DenseVector(), Array[String]())
-      case LabeledPoint(label, _, _, _) => LabeledPoint(label, scale(point), DenseVector(), Array[String]())
+      case UnlabeledPoint(_, _, _, di) => UnlabeledPoint(scale(point), DenseVector(), Array[String](), di)
+      case LabeledPoint(label, _, _, _, di) => LabeledPoint(label, scale(point), DenseVector(), Array[String](), di)
     }
   }
 
-  private def scale(point: Point): Vector = {
+  private def scale(point: LearningPoint): Vector = {
     if (min.length == 1)
       ((point.getNumericVector.asBreeze - min(0)) / (max(0) - min(0))).fromBreeze
     else
       ((point.getNumericVector.asBreeze - min) / (max - min)).fromBreeze
   }
 
-  override def transform(dataSet: ListBuffer[Point]): ListBuffer[Point] = {
-    val transformedBuffer = ListBuffer[Point]()
+  override def transform(dataSet: ListBuffer[LearningPoint]): ListBuffer[LearningPoint] = {
+    val transformedBuffer = ListBuffer[LearningPoint]()
     for (point <- dataSet) transformedBuffer.append(transform(point))
     transformedBuffer
   }

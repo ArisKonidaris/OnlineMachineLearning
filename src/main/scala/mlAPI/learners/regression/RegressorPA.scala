@@ -2,9 +2,9 @@ package mlAPI.learners.regression
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.learners.{Learner, PassiveAggressiveLearners}
-import mlAPI.parameters.{VectorBias => lin_params}
+import mlAPI.parameters.{VectorBias => linearParams}
 import mlAPI.scores.Scores
 
 import scala.collection.mutable
@@ -15,17 +15,17 @@ import mlAPI.utils.Parsing
 
 case class RegressorPA() extends PassiveAggressiveLearners with Regressor with Serializable {
 
-  weights = new lin_params()
+  weights = new linearParams()
   private var epsilon: Double = 0.0
 
-  override def predict(data: Point): Option[Double] = predictWithMargin(data)
+  override def predict(data: LearningPoint): Option[Double] = predictWithMargin(data)
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     fitLoss(data)
     ()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     predictWithMargin(data) match {
       case Some(prediction) =>
         val label: Double = data.asInstanceOf[LabeledPoint].label
@@ -33,7 +33,7 @@ case class RegressorPA() extends PassiveAggressiveLearners with Regressor with S
         if (loss > 0.0) {
           val Lagrange_Multiplier: Double = LagrangeMultiplier(loss, data)
           val sign: Double = if ((label - prediction) >= 0) 1.0 else -1.0
-          weights += lin_params(
+          weights += linearParams(
             (data.getNumericVector.asBreeze * (Lagrange_Multiplier * sign)).asInstanceOf[BreezeDenseVector[Double]],
             Lagrange_Multiplier * sign)
         }
@@ -44,8 +44,8 @@ case class RegressorPA() extends PassiveAggressiveLearners with Regressor with S
     }
   }
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.RMSE(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.RMSE(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   def setEpsilon(epsilon: Double): RegressorPA = {
     this.epsilon = epsilon

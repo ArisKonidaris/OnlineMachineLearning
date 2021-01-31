@@ -2,7 +2,7 @@ package mlAPI.learners.regression
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint, Point}
 import mlAPI.learners.Learner
 import mlAPI.parameters.{LearningParameters, MatrixBias}
 
@@ -24,12 +24,12 @@ case class ORR() extends Regressor with Serializable {
   protected var weights: MatrixBias = _
   protected var lambda: Double = 0.0
 
-  override def initializeModel(data: Point): Learner = {
+  override def initializeModel(data: LearningPoint): Learner = {
     weights = modelInit(data.getNumericVector.size + 1)
     this
   }
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     try {
       val x: BreezeDenseVector[Double] = addBias(data)
       Some(weights.b.t * pinv(weights.A) * x)
@@ -38,14 +38,14 @@ case class ORR() extends Regressor with Serializable {
         None
     }
   }
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)
     predictions.toArray
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     val x: BreezeDenseVector[Double] = addBias(data)
     try {
       weights += MatrixBias(x * x.t, data.asInstanceOf[LabeledPoint].label * x)
@@ -56,23 +56,23 @@ case class ORR() extends Regressor with Serializable {
     }
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     val loss: Double =
       Math.pow(data.asInstanceOf[LabeledPoint].label - predict(data).get, 2) +
         lambda * Math.pow(weights.frobeniusNorm, 2)
-    fit(data: Point)
+    fit(data)
     loss
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fit(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.RMSE(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.RMSE(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   private def modelInit(n: Int): MatrixBias = {
     MatrixBias(lambda * diag(BreezeDenseVector.fill(n) {0.0}),
@@ -80,7 +80,7 @@ case class ORR() extends Regressor with Serializable {
     )
   }
 
-  private def addBias(data: Point): BreezeDenseVector[Double] = {
+  private def addBias(data: LearningPoint): BreezeDenseVector[Double] = {
     BreezeDenseVector.vertcat(
       data.getNumericVector.asBreeze.asInstanceOf[BreezeDenseVector[Double]],
       BreezeDenseVector.ones(1))

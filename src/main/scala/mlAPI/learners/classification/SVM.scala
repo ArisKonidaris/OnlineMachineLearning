@@ -3,7 +3,7 @@ package mlAPI.learners.classification
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
 import mlAPI.learners.Learner
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.parameters.{LearningParameters, VectorBias}
 import mlAPI.scores.Scores
 import breeze.linalg.{DenseVector => BreezeDenseVector}
@@ -26,12 +26,12 @@ case class SVM() extends Classifier with Serializable {
   protected var weights: VectorBias = _
   protected var count: Long = 0L
 
-  override def initializeModel(data: Point): Learner = {
+  override def initializeModel(data: LearningPoint): Learner = {
     weights = VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
     this
   }
 
-  def predictWithMargin(data: Point): Option[Double] = {
+  def predictWithMargin(data: LearningPoint): Option[Double] = {
     try {
       Some((data.getNumericVector.asBreeze dot weights.weights) + weights.intercept)
     } catch {
@@ -39,26 +39,26 @@ case class SVM() extends Classifier with Serializable {
     }
   }
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     predictWithMargin(data) match {
       case Some(pred) => if (pred >= 0.0) Some(1.0) else Some(-1.0)
       case None => Some(Double.MinValue)
     }
   }
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)
     predictions.toArray
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     if (count < Long.MaxValue) fitLoss(data)
     ()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     if (count == Long.MaxValue)
       0
     else
@@ -80,19 +80,19 @@ case class SVM() extends Classifier with Serializable {
       }
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.F1Score(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   private def createLabel(label: Double): Double = if (label == 0.0) -1.0 else label
 
-  private def checkParameters(data: Point): Unit = {
+  private def checkParameters(data: LearningPoint): Unit = {
     if (weights == null) {
       initializeModel(data)
     } else {

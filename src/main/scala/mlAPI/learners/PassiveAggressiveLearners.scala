@@ -1,7 +1,7 @@
 package mlAPI.learners
 
 import mlAPI.math.Breeze._
-import mlAPI.math.Point
+import mlAPI.math.LearningPoint
 import mlAPI.parameters.{LearningParameters, VectorBias}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
@@ -19,12 +19,12 @@ abstract class PassiveAggressiveLearners extends Learner {
   protected var C: Double = 0.01
   protected var weights: VectorBias = _
 
-  override def initializeModel(data: Point): Learner = {
+  override def initializeModel(data: LearningPoint): Learner = {
     weights = VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0)
     this
   }
 
-  protected def predictWithMargin(data: Point): Option[Double] = {
+  protected def predictWithMargin(data: LearningPoint): Option[Double] = {
     try {
       Some((data.getNumericVector.asBreeze dot weights.weights) + weights.intercept)
     } catch {
@@ -32,14 +32,14 @@ abstract class PassiveAggressiveLearners extends Learner {
     }
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  protected def LagrangeMultiplier(loss: Double, data: Point): Double = {
+  protected def LagrangeMultiplier(loss: Double, data: LearningPoint): Double = {
     updateType match {
       case "STANDARD" => loss / (1.0 + ((data.getNumericVector dot data.getNumericVector) + 1.0))
       case "PA-I" => Math.min(C, loss / ((data.getNumericVector dot data.getNumericVector) + 1.0))
@@ -47,7 +47,7 @@ abstract class PassiveAggressiveLearners extends Learner {
     }
   }
 
-  protected def checkParameters(data: Point): Unit = {
+  protected def checkParameters(data: LearningPoint): Unit = {
     if (weights == null) {
       initializeModel(data)
     } else {
@@ -77,7 +77,7 @@ abstract class PassiveAggressiveLearners extends Learner {
     this
   }
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)

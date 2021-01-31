@@ -3,7 +3,7 @@ package mlAPI.mlworkers.worker
 import ControlAPI.Request
 import BipartiteTopologyAPI.NodeInstance
 import BipartiteTopologyAPI.annotations.MergeOp
-import mlAPI.math.Point
+import mlAPI.math.LearningPoint
 import mlAPI.pipelines.MLPipeline
 import mlAPI.parameters.LearningParameters
 import mlAPI.parameters.utils.ParameterDescriptor
@@ -162,7 +162,7 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   }
 
   /** The method called on a data point to train the ML Pipeline. */
-  def fit(data: Point): Unit = {
+  def fit(data: LearningPoint): Unit = {
     if ((processedData + 1) % getMiniBatchSize == 0)
       mlPipeline.fitLoss(data)
     else
@@ -190,14 +190,14 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
    * @param testSet The test set to calculate the performance on.
    * @return A String representation of the performance of the model.
    */
-  def getPerformance(testSet: ListBuffer[Point]): Double = mlPipeline.score(testSet)
+  def getPerformance(testSet: ListBuffer[LearningPoint]): Double = mlPipeline.score(testSet)
 
   /** A method for calculating the performance of the global model.
    *
    * @param testSet The test set to calculate the performance on.
    * @return A String representation of the performance of the model.
    */
-  def getGlobalPerformance(testSet: ListBuffer[Point]): Double = globalModel.score(testSet)
+  def getGlobalPerformance(testSet: ListBuffer[LearningPoint]): Double = globalModel.score(testSet)
 
   /** Converts the model into a Serializable POJO case class to be send over the Network. */
   def ModelMarshalling(sparse: Boolean, warm: Boolean, model: LearningParameters): Array[Array[ParameterDescriptor]]

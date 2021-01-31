@@ -1,7 +1,7 @@
 package mlAPI.preprocessing
 
 import ControlAPI.PreprocessorPOJO
-import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint}
+import mlAPI.math.{DenseVector, LabeledPoint, LearningPoint, UnlabeledPoint}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -46,29 +46,33 @@ case class FeatureFilter(private var dropNumeric: List[Int],
     this
   }
 
-  override def transform(point: Point): Point = {
-
+  override def transform(point: LearningPoint): LearningPoint = {
     assert(
       point.numericVector.size > dropNumeric.length &&
         point.discreteVector.size > dropDiscrete.length &&
         point.categoricalVector.length > dropCategorical.length
     )
-
     point match {
-      case LabeledPoint(label, numericalFeatures, discreteFeatures, categoricalFeatures) =>
-        LabeledPoint(label,
+      case LabeledPoint(label, numericalFeatures, discreteFeatures, categoricalFeatures, dataInstance) =>
+        LabeledPoint(
+          label,
           DenseVector(drop(dropNumeric, numericalFeatures.toList).toArray.asInstanceOf[Array[Double]]),
           DenseVector(drop(dropDiscrete, discreteFeatures.toList).toArray.asInstanceOf[Array[Double]]),
-          drop(dropCategorical, categoricalFeatures.toList).toArray.asInstanceOf[Array[String]])
-      case UnlabeledPoint(numericalFeatures, discreteFeatures, categoricalFeatures) =>
-        UnlabeledPoint(DenseVector(drop(dropNumeric, numericalFeatures.toList).toArray.asInstanceOf[Array[Double]]),
+          drop(dropCategorical, categoricalFeatures.toList).toArray.asInstanceOf[Array[String]],
+          dataInstance
+        )
+      case UnlabeledPoint(numericalFeatures, discreteFeatures, categoricalFeatures, dataInstance) =>
+        UnlabeledPoint(
+          DenseVector(drop(dropNumeric, numericalFeatures.toList).toArray.asInstanceOf[Array[Double]]),
           DenseVector(drop(dropDiscrete, discreteFeatures.toList).toArray.asInstanceOf[Array[Double]]),
-          drop(dropCategorical, categoricalFeatures.toList).toArray.asInstanceOf[Array[String]])
+          drop(dropCategorical, categoricalFeatures.toList).toArray.asInstanceOf[Array[String]],
+          dataInstance
+        )
     }
   }
 
-  override def transform(dataSet: ListBuffer[Point]): ListBuffer[Point] = {
-    val transformedSet = ListBuffer[Point]()
+  override def transform(dataSet: ListBuffer[LearningPoint]): ListBuffer[LearningPoint] = {
+    val transformedSet = ListBuffer[LearningPoint]()
     for (data <- dataSet) transformedSet.append(transform(data))
     transformedSet
   }

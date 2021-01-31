@@ -1,5 +1,8 @@
 package mlAPI.math
 
+import ControlAPI.DataInstance
+import com.fasterxml.jackson.databind.ObjectMapper
+
 /**
  * A trait representing a data point required for
  * machine learning tasks.
@@ -9,6 +12,7 @@ trait Point extends Serializable {
   var numericVector: Vector
   var discreteVector: Vector
   var categoricalVector: Array[String]
+  var dataInstance: String
 
   def validDiscreteVector: Boolean = {
     if (discreteVector.size == 0)
@@ -31,13 +35,17 @@ trait Point extends Serializable {
 
   def getCategoricalVector: Array[String] = categoricalVector
 
+  def getDataInstance: String = dataInstance
+
+  def setDataInstance(dataInstance: String): Unit = this.dataInstance = dataInstance
+
   def numericToList: List[Double] = numericVector.toList
 
   def discreteToList: List[Double] = discreteVector.toList
 
   def categoricalToList: List[String] = categoricalVector.toList
 
-  def marshal(): (Array[Int], Array[Double], Array[String]) = {
+  def marshal(): (Array[Int], Array[Double], Array[String], String) = {
     (
       Array[Int](numericVector.size, discreteVector.size),
       {
@@ -45,93 +53,24 @@ trait Point extends Serializable {
         val ar2: Array[Double] = discreteVector.toList.toArray
         ar1 ++ ar2
       },
-      categoricalVector
+      categoricalVector,
+      dataInstance
     )
   }
 
-  def asUnlabeledPoint: UnlabeledPoint = UnlabeledPoint(numericVector, discreteVector, categoricalVector)
+  def asUnlabeledPoint: UnlabeledPoint = UnlabeledPoint(numericVector, discreteVector, categoricalVector, dataInstance)
 
-}
+  def asTrainingPoint: TrainingPoint
 
-/**
- * A data point without a label. Could be used for
- * prediction or unsupervised machine learning.
- *
- * @param numericVector The numeric features.
- * @param discreteVector The discrete features.
- * @param categoricalVector The categorical features.
- */
-case class UnlabeledPoint(var numericVector: Vector, var discreteVector: Vector, var categoricalVector: Array[String])
-  extends Point {
+  def asForecastingPoint: ForecastingPoint = ForecastingPoint(asUnlabeledPoint)
 
-  def this() = this(DenseVector(), DenseVector(), Array[String]())
-
-  def this(numericVector: Vector) = this(numericVector, DenseVector(), Array[String]())
-
-  def this(numericVector: Vector, categoricalVector: Array[String]) =
-    this(numericVector, DenseVector(), categoricalVector)
-
-  require(validDiscreteVector)
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case unlabeledPoint: UnlabeledPoint =>
-        numericVector.equals(unlabeledPoint.numericVector) &&
-          discreteVector.equals(unlabeledPoint.discreteVector) &&
-          categoricalVector.equals(unlabeledPoint.categoricalVector)
-      case _ => false
-    }
+  def toDataInstance: DataInstance = {
+    val mapper: ObjectMapper = new ObjectMapper()
+    val instance = mapper.readValue(dataInstance, classOf[DataInstance])
+    if (instance.isValid)
+      instance
+    else
+      throw new RuntimeException("Cannot convert Point to DataInstance.")
   }
-
-  override def toString: String =
-    s"UnlabeledPoint($numericVector, $discreteVector, ${categoricalVector.mkString("Array(", ", ", ")")})"
-
-  def convertToLabeledPoint(label: Double): LabeledPoint =
-    LabeledPoint(label, numericVector, discreteVector, categoricalVector)
-
-}
-
-/**
- * This class represents a vector with an associated label as
- * it is required for many supervised learning tasks.
- *
- * @param label  Label of the data point.
- * @param numericVector  The numeric features.
- * @param discreteVector The discrete features.
- * @param categoricalVector The categorical features.
- */
-case class LabeledPoint(var label: Double,
-                        var numericVector: Vector,
-                        var discreteVector: Vector,
-                        var categoricalVector: Array[String])
-  extends Point {
-
-  def this() = this(0.0, DenseVector(), DenseVector(), Array[String]())
-  def this(label: Double) = this(label, DenseVector(), DenseVector(), Array[String]())
-  def this(label: Double, numericVector: Vector) = this(label, numericVector, DenseVector(), Array[String]())
-  def this(label: Double, numericVector: Vector, categoricalVector: Array[String]) =
-    this(label, numericVector, DenseVector(), categoricalVector)
-
-  require(validDiscreteVector)
-
-  def getLabel: Double = label
-
-  def setLabel(label: Double): Unit = this.label = label
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case labeledPoint: LabeledPoint =>
-        label.equals(labeledPoint.label) &&
-          numericVector.equals(labeledPoint.numericVector) &&
-          discreteVector.equals(labeledPoint.discreteVector) &&
-          categoricalVector.equals(labeledPoint.categoricalVector)
-      case _ => false
-    }
-  }
-
-  override def toString: String =
-    s"LabeledPoint($label, $numericVector, $discreteVector, ${categoricalVector.mkString("Array(", ", ", ")")})"
-
-  def convertToUnlabeledPoint(): UnlabeledPoint = UnlabeledPoint(numericVector, discreteVector, categoricalVector)
 
 }

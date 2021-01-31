@@ -2,7 +2,7 @@ package mlAPI.pipelines
 
 import ControlAPI.{Request, LearnerPOJO => POJOLearner, PreprocessorPOJO => POJOPreprocessor}
 import ControlAPI.{TransformerPOJO => POJOTransformer}
-import mlAPI.math.{Point, Vector}
+import mlAPI.math.LearningPoint
 import mlAPI.learners.Learner
 import mlAPI.learners.classification.nn.NeuralNetwork
 import mlAPI.learners.classification.{MultiClassPA, PA, SVM}
@@ -161,7 +161,7 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
 
   // =================================== ML pipeline basic operations ==============================
 
-  def init(data: Point): MLPipeline = {
+  def init(data: LearningPoint): MLPipeline = {
     require(learner != null, "The ML Pipeline must have a learner to fit.")
     pipePoint(data, preprocess, learner.initializeModel)
     this
@@ -173,13 +173,13 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     learner = null
   }
 
-  def fit(data: Point): Unit = {
+  def fit(data: LearningPoint): Unit = {
     require(learner != null, "The ML Pipeline must have a learner to fit data.")
     pipePoint(data, preprocess, learner.fit)
     incrementFitCount()
   }
 
-  def fitLoss(data: Point): Unit = {
+  def fitLoss(data: LearningPoint): Unit = {
     require(learner != null, "The ML Pipeline must have a learner to fit data.")
     val loss = pipePoint(data, preprocess, learner.fitLoss)
     meanLoss.update(loss)
@@ -187,13 +187,13 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     incrementFitCount()
   }
 
-  def fit(mini_batch: ListBuffer[Point]): Unit = {
+  def fit(miniBatch: ListBuffer[LearningPoint]): Unit = {
     require(learner != null, "The ML Pipeline must have a learner to fit data.")
-    pipePoints(mini_batch, preprocess, learner.fit)
-    incrementFitCount(mini_batch.length.asInstanceOf[Long])
+    pipePoints(miniBatch, preprocess, learner.fit)
+    incrementFitCount(miniBatch.length.asInstanceOf[Long])
   }
 
-  def fitLoss(mini_batch: ListBuffer[Point]): Unit = {
+  def fitLoss(mini_batch: ListBuffer[LearningPoint]): Unit = {
     require(learner != null, "The ML Pipeline must have a learner to fit data.")
     val loss = pipePoints(mini_batch, preprocess, learner.fitLoss)
     meanLoss.update(loss)
@@ -201,19 +201,19 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     incrementFitCount(mini_batch.length.asInstanceOf[Long])
   }
 
-  def predict(data: Point): Option[Double] = {
+  def predict(data: LearningPoint): Option[Double] = {
     require(learner != null, "The ML Pipeline must have a learner to make a prediction.")
     pipePoint(data, preprocess, learner.predict)
   }
 
-  def score(testSet: ListBuffer[Point]): Double = {
+  def score(testSet: ListBuffer[LearningPoint]): Double = {
     require(learner != null, "Cannot calculate performance. The ML Pipeline doesn't contain a learner.")
     pipePoints(testSet, preprocess, learner.score)
   }
 
-  private def incrementFitCount(mini_batch: Long = 1): Unit = {
-    if (fittedData < Long.MaxValue - mini_batch)
-      fittedData += mini_batch
+  private def incrementFitCount(miniBatch: Long = 1): Unit = {
+    if (fittedData < Long.MaxValue - miniBatch)
+      fittedData += miniBatch
     else
       fittedData = Long.MaxValue
   }
@@ -266,7 +266,7 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
     (prPJ, lrPJ, fittedData, meanLoss.getMean, cumulativeLoss)
   }
 
-  def generatePOJO(testSet: ListBuffer[Point]): (List[POJOPreprocessor], POJOLearner, Long, Double, Double, Double) = {
+  def generatePOJO(testSet: ListBuffer[LearningPoint]): (List[POJOPreprocessor], POJOLearner, Long, Double, Double, Double) = {
     val genPJ = generatePOJO
     (genPJ._1, genPJ._2, genPJ._3, genPJ._4, genPJ._5, score(testSet))
   }
@@ -282,12 +282,12 @@ object MLPipeline {
   // ====================================== Operations =============================================
 
   @scala.annotation.tailrec
-  final def pipePoint[T](data: Point, list: ListBuffer[Preprocessor], f: Point => T): T = {
+  final def pipePoint[T](data: LearningPoint, list: ListBuffer[Preprocessor], f: LearningPoint => T): T = {
     if (list.isEmpty) f(data) else pipePoint(list.head.transform(data), list.tail, f)
   }
 
   @scala.annotation.tailrec
-  final def pipePoints[T](data: ListBuffer[Point], list: ListBuffer[Preprocessor], f: ListBuffer[Point] => T): T = {
+  final def pipePoints[T](data: ListBuffer[LearningPoint], list: ListBuffer[Preprocessor], f: ListBuffer[LearningPoint] => T): T = {
     if (list.isEmpty) f(data) else pipePoints(list.head.transform(data), list.tail, f)
   }
 

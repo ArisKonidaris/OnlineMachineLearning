@@ -1,8 +1,8 @@
 package mlAPI.mlworkers.worker.proto
 
 import BipartiteTopologyAPI.annotations.{InitOp, ProcessOp, QueryOp}
-import ControlAPI.{QueryResponse, Request}
-import mlAPI.math.Point
+import ControlAPI.{Prediction, QueryResponse, Request}
+import mlAPI.math.{ForecastingPoint, LabeledPoint, UsablePoint, LearningPoint, TrainingPoint, UnlabeledPoint}
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.mlworkers.worker.{MLWorker, VectoredWorker}
 import mlAPI.parameters.VectoredParameters
@@ -48,12 +48,8 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
       getProxy(i).pull()
   }
 
-  /** The consumption of a data point by the Machine Learning FGM worker.
-   *
-   * @param data A data point to be fitted to the model.
-   */
-  @ProcessOp
-  def receiveTuple(data: Point): Unit = {
+  /** A method for training the GM worker on a training data point. */
+  def train(data: LearningPoint): Unit = {
     fit(data)
     if (!isWarmedUp) {
       if (processedData >= getMiniBatchSize * miniBatches) {
@@ -85,6 +81,25 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
           violatedAR = true
           getProxy(0).violation()
         }
+    }
+  }
+
+  /** The consumption of a data point by the Machine Learning FGM worker.
+   *
+   * @param data A data point to be fitted to the model.
+   */
+  @ProcessOp
+  def receiveTuple(data: UsablePoint): Unit = {
+    data match {
+      case TrainingPoint(trainingPoint) => train(trainingPoint)
+      case ForecastingPoint(forecastingPoint) =>
+        val prediction = {
+          mlPipeline.predict(forecastingPoint) match {
+            case Some(prediction: Double) => prediction
+            case None => Double.MaxValue
+          }
+        }
+        getQuerier.sendQueryResponse(new Prediction(getNetworkID(), forecastingPoint.toDataInstance, prediction))
     }
   }
 
@@ -174,9 +189,15 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
    * @param predicates The predicated of the query.
    */
   @QueryOp
-  def query(queryId: Long, queryTarget: Int, predicates: (Double, Array[Point])): Unit = {
+  def query(queryId: Long, queryTarget: Int, predicates: (Double, Array[UsablePoint])): Unit = {
     val pj = mlPipeline.generatePOJO
-    val score = getGlobalPerformance(ListBuffer(predicates._2: _ *))
+    val testSet: Array[LearningPoint] = predicates._2.map {
+      case TrainingPoint(trainingPoint) => trainingPoint
+      case ForecastingPoint(forecastingPoint) => forecastingPoint
+      case labeledPoint: LabeledPoint => labeledPoint
+      case unlabeledPoint: UnlabeledPoint => unlabeledPoint
+    }
+    val score = getGlobalPerformance(ListBuffer(testSet: _ *))
     if (queryId == -1)
       getQuerier.sendQueryResponse(
         new QueryResponse(-1,

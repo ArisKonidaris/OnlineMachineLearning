@@ -4,7 +4,7 @@ import ControlAPI.LearnerPOJO
 import org.nd4j.linalg.dataset.DataSet
 import mlAPI.learners.{Learner, SGDUpdate}
 import mlAPI.learners.classification.Classifier
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.parameters.{DLParams, LearningParameters}
 import mlAPI.utils.Parsing
@@ -105,7 +105,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
   def getParametersInfo: NNParametersInfo = NNParametersInfo(this.NN)
 
   @tailrec
-  private def concatFeatures(batch: ListBuffer[Point], result: ListBuffer[Double]): Array[Double] = {
+  private def concatFeatures(batch: ListBuffer[LearningPoint], result: ListBuffer[Double]): Array[Double] = {
     if (batch.isEmpty)
       result.toArray
     else
@@ -113,7 +113,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
   }
 
   @tailrec
-  private def concatPoints(batch: ListBuffer[Point], features: ListBuffer[Double], labels: ListBuffer[Double])
+  private def concatPoints(batch: ListBuffer[LearningPoint], features: ListBuffer[Double], labels: ListBuffer[Double])
   : (Array[Double], Array[Double]) = {
     if (batch.isEmpty)
       (features.toArray, labels.toArray)
@@ -126,7 +126,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     }
   }
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     val dataPoint = Nd4j.create(data.numericVector.toArray, inputShape, 'c')
     try {
       Some(NN.output(dataPoint, false).toDoubleVector.zipWithIndex.maxBy(_._1)._2.toDouble)
@@ -135,7 +135,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     }
   }
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     try {
       NN.output(
         Nd4j.create(concatFeatures(batch, ListBuffer[Double]()), inputShape.updated(0, batch.length), 'c'),
@@ -146,7 +146,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     }
   }
 
-  def constructMiniBatch(data: Point): Unit = {
+  def constructMiniBatch(data: LearningPoint): Unit = {
     val dataPoint = data.asInstanceOf[LabeledPoint]
     batchX ++= dataPoint.getNumericVector.toArray
     batchY ++= (for (i <- 0 to 9) yield { if (i * 1.0 == dataPoint.getLabel - 1.0) 1.0 else 0.0 }).toArray
@@ -180,24 +180,24 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     loss
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     constructMiniBatch(data)
     fitMiniBatch()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     constructMiniBatch(data)
     fitMiniBatchLoss()
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(testSet: ListBuffer[Point]): Double = {
+  override def score(testSet: ListBuffer[LearningPoint]): Double = {
     if (testSet.nonEmpty) {
       val (testX, testY) = concatPoints(testSet, ListBuffer[Double](), ListBuffer[Double]())
       val tX = Nd4j.create(testX, inputShape.updated(0, testSet.length), 'c')

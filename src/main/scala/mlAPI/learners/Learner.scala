@@ -1,7 +1,7 @@
 package mlAPI.learners
 
 import ControlAPI.LearnerPOJO
-import mlAPI.math.Point
+import mlAPI.math.{LearningPoint, Point}
 import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters, WithParams}
 import mlAPI.parameters.LearningParameters
 
@@ -65,21 +65,21 @@ trait Learner extends Serializable with WithParams {
 
   def initializeModel(): Learner = this
 
-  def initializeModel(data: Point): Learner = this
+  def initializeModel(data: LearningPoint): Learner = this
 
-  def predict(data: Point): Option[Double]
+  def predict(data: LearningPoint): Option[Double]
 
-  def predict(batch: ListBuffer[Point]): Array[Option[Double]]
+  def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]]
 
-  def fit(data: Point): Unit
+  def fit(data: LearningPoint): Unit
 
-  def fit(batch: ListBuffer[Point]): Unit
+  def fit(batch: ListBuffer[LearningPoint]): Unit
 
-  def fitLoss(data: Point): Double
+  def fitLoss(data: LearningPoint): Double
 
-  def fitLoss(batch: ListBuffer[Point]): Double
+  def fitLoss(batch: ListBuffer[LearningPoint]): Double
 
-  def score(test_set: ListBuffer[Point]): Double
+  def score(testSet: ListBuffer[LearningPoint]): Double
 
   def generateParameters: ParameterDescriptor => LearningParameters
 

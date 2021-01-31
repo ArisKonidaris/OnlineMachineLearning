@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import mlAPI.learners.classification.trees.HoeffdingTree
 import mlAPI.learners.classification.trees.serializable.HTDescriptor
 import mlAPI.learners.Learner
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.parameters.utils.{ParameterDescriptor, SerializableParameters}
 import mlAPI.parameters.{HTParameters, LearningParameters}
 import mlAPI.scores.Scores
@@ -25,16 +25,16 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
   override protected val parallelizable: Boolean = false
   var tree: HTParameters = HTParameters(new HoeffdingTree())
 
-  override def predict(data: Point): Option[Double] = Some(tree.ht.predict(data.asUnlabeledPoint)._1)
+  override def predict(data: LearningPoint): Option[Double] = Some(tree.ht.predict(data.asUnlabeledPoint)._1)
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)
     predictions.toArray
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     data match {
       case labeledPoint: LabeledPoint => tree.ht.fit(labeledPoint)
       case _ =>
@@ -42,7 +42,7 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     }
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     data match {
       case labeledPoint: LabeledPoint => 1.0 * tree.ht.fit(labeledPoint)
       case _ =>
@@ -50,15 +50,15 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     }
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.F1Score(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   override def getParameters: Option[LearningParameters] = Some(tree)
 

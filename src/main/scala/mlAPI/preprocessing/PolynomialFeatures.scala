@@ -1,7 +1,7 @@
 package mlAPI.preprocessing
 
 import ControlAPI.PreprocessorPOJO
-import mlAPI.math.{DenseVector, LabeledPoint, Point, UnlabeledPoint}
+import mlAPI.math.{DenseVector, LabeledPoint, LearningPoint, UnlabeledPoint}
 
 import scala.collection.mutable
 import scala.collection.JavaConverters._
@@ -22,10 +22,10 @@ case class PolynomialFeatures() extends Preprocessor {
 
   private var degree: Int = 2
 
-  override def transform(point: Point): Point = polynomial(point, degree)
+  override def transform(point: LearningPoint): LearningPoint = polynomial(point, degree)
 
-  override def transform(dataSet: ListBuffer[Point]): ListBuffer[Point] = {
-    val transformedSet = ListBuffer[Point]()
+  override def transform(dataSet: ListBuffer[LearningPoint]): ListBuffer[LearningPoint] = {
+    val transformedSet = ListBuffer[LearningPoint]()
     for (data <- dataSet) transformedSet.append(transform(data))
     transformedSet
   }
@@ -71,7 +71,6 @@ case class PolynomialFeatures() extends Preprocessor {
 
 object PolynomialFeatures {
 
-
   // =================================== Factory methods ===========================================
 
   def apply(): PolynomialFeatures = {
@@ -80,17 +79,23 @@ object PolynomialFeatures {
 
   // ====================================== Operations =============================================
 
-  def polynomial(point: Point, degree: Int): Point = {
+  def polynomial(point: LearningPoint, degree: Int): LearningPoint = {
     point match {
-      case LabeledPoint(label, numericalFeatures, _, _) =>
-        LabeledPoint(label,
+      case LabeledPoint(label, numericalFeatures, discreteFeatures, categoricalFeatures, di) =>
+        LabeledPoint(
+          label,
           DenseVector(combinations(numericalFeatures.toList, degree).toArray),
-          DenseVector(),
-          Array[String]())
-      case UnlabeledPoint(numericalFeatures, _, _) =>
-        UnlabeledPoint(DenseVector(combinations(numericalFeatures.toList, degree).toArray),
-          DenseVector(),
-          Array[String]())
+          discreteFeatures,
+          categoricalFeatures,
+          di
+        )
+      case UnlabeledPoint(numericalFeatures, discreteFeatures, categoricalFeatures, di) =>
+        UnlabeledPoint(
+          DenseVector(combinations(numericalFeatures.toList, degree).toArray),
+          discreteFeatures,
+          categoricalFeatures,
+          di
+        )
     }
   }
 

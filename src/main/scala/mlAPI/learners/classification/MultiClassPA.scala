@@ -2,7 +2,7 @@ package mlAPI.learners.classification
 
 import ControlAPI.LearnerPOJO
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.learners.Learner
 import mlAPI.parameters.{LearningParameters, VectorBias, VectorBiasList}
 import breeze.linalg.{DenseVector => BreezeDenseVector}
@@ -27,14 +27,14 @@ case class MultiClassPA() extends Classifier with Serializable {
   protected var weights: VectorBiasList = _
   protected var nClasses: Int = 3
 
-  override def initializeModel(data: Point): Learner = {
+  override def initializeModel(data: LearningPoint): Learner = {
     val vbl: ListBuffer[VectorBias] = ListBuffer[VectorBias]()
     for (_ <- 0 until nClasses) vbl.append(VectorBias(BreezeDenseVector.zeros[Double](data.getNumericVector.size), 0.0))
     weights = VectorBiasList(vbl)
     this
   }
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     try {
       var prediction: Int = -1
       var highestScore: Double = -Double.MaxValue
@@ -51,19 +51,19 @@ case class MultiClassPA() extends Classifier with Serializable {
     }
   }
 
-  override def predict(batch: ListBuffer[Point]): Array[Option[Double]] = {
+  override def predict(batch: ListBuffer[LearningPoint]): Array[Option[Double]] = {
     val predictions: ListBuffer[Option[Double]] = ListBuffer[Option[Double]]()
     for (point <- batch)
       predictions append predict(point)
     predictions.toArray
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     fitLoss(data)
     ()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     predict(data) match {
       case Some(prediction) =>
         val label: Double = data.asInstanceOf[LabeledPoint].label
@@ -94,17 +94,17 @@ case class MultiClassPA() extends Classifier with Serializable {
     }
   }
 
-  override def fit(batch: ListBuffer[Point]): Unit = {
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
     fitLoss(batch)
     ()
   }
 
-  override def fitLoss(batch: ListBuffer[Point]): Double = (for (point <- batch) yield fitLoss(point)).sum
+  override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.F1Score(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
-  private def tau(loss: Double, data: Point): Double = {
+  private def tau(loss: Double, data: LearningPoint): Double = {
     updateType match {
       case "STANDARD" => loss / (1.0 + 2.0 * ((data.getNumericVector dot data.getNumericVector) + 1.0))
       case "PA-I" => Math.min(C / 2.0, loss / (2.0 * ((data.getNumericVector dot data.getNumericVector) + 1.0)))
@@ -114,7 +114,7 @@ case class MultiClassPA() extends Classifier with Serializable {
 
   private def setNumberOfClasses(nClasses: Int): Unit = this.nClasses = nClasses
 
-  private def checkParameters(data: Point): Unit = {
+  private def checkParameters(data: LearningPoint): Unit = {
     if (weights == null) {
       initializeModel(data)
     } else {

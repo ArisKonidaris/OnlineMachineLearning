@@ -1,7 +1,7 @@
 package mlAPI.preprocessing
 
 import ControlAPI.PreprocessorPOJO
-import mlAPI.math.Point
+import mlAPI.math.LearningPoint
 import mlAPI.parameters.utils.WithParams
 
 import scala.collection.mutable
@@ -15,9 +15,9 @@ trait Preprocessor extends Serializable with WithParams {
 
   // =============================== Data transformation methods ===================================
 
-  def transform(point: Point): Point
+  def transform(point: LearningPoint): LearningPoint
 
-  def transform(dataSet: ListBuffer[Point]): ListBuffer[Point]
+  def transform(dataSet: ListBuffer[LearningPoint]): ListBuffer[LearningPoint]
 
   def generatePOJOPreprocessor: PreprocessorPOJO
 

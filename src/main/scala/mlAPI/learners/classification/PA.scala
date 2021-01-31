@@ -3,7 +3,7 @@ package mlAPI.learners.classification
 import ControlAPI.LearnerPOJO
 import mlAPI.learners.PassiveAggressiveLearners
 import mlAPI.math.Breeze._
-import mlAPI.math.{LabeledPoint, Point}
+import mlAPI.math.{LabeledPoint, LearningPoint}
 import mlAPI.parameters.VectorBias
 import mlAPI.scores.Scores
 import mlAPI.utils.Parsing
@@ -19,19 +19,19 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Serializa
 
   override protected var targetLabel: Double = 1.0
 
-  override def predict(data: Point): Option[Double] = {
+  override def predict(data: LearningPoint): Option[Double] = {
     predictWithMargin(data) match {
       case Some(pred) => if (pred >= 0.0) Some(1.0) else Some(-1.0)
       case None => Some(Double.MinValue)
     }
   }
 
-  override def fit(data: Point): Unit = {
+  override def fit(data: LearningPoint): Unit = {
     fitLoss(data)
     ()
   }
 
-  override def fitLoss(data: Point): Double = {
+  override def fitLoss(data: LearningPoint): Double = {
     predictWithMargin(data) match {
       case Some(prediction) =>
         val label: Double = createLabel(data.asInstanceOf[LabeledPoint].label)
@@ -48,8 +48,8 @@ case class PA() extends PassiveAggressiveLearners with Classifier with Serializa
     }
   }
 
-  override def score(test_set: ListBuffer[Point]): Double =
-    Scores.F1Score(test_set.asInstanceOf[ListBuffer[LabeledPoint]], this)
+  override def score(testSet: ListBuffer[LearningPoint]): Double =
+    Scores.F1Score(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 
   private def createLabel(label: Double): Double = if (label != targetLabel) -1.0 else label
 
