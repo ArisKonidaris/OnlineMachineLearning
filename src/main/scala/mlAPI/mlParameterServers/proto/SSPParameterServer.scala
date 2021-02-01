@@ -51,6 +51,7 @@ case class SSPParameterServer() extends VectoredPS[RemoteLearner, Querier] with 
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).updateModel(slice)
+    getProxy(0).updateModel(ParameterDescriptor(null, null, null, null, null, null))
   }
 
   /** A method used by the workers for requesting the global model from the parameter server(s). */

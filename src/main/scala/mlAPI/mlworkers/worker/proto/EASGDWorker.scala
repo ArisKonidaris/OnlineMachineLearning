@@ -66,6 +66,7 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
+        blockStream()
       } else
         pull()
   }
@@ -79,10 +80,14 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
-        val prediction = {
-          mlPipeline.predict(forecastingPoint) match {
-            case Some(prediction: Double) => prediction
-            case None => Double.MaxValue
+        val prediction: Double = {
+          try {
+            globalModel.predict(forecastingPoint) match {
+              case Some(prediction: Double) => prediction
+              case None => Double.NaN
+            }
+          } catch {
+            case _: Throwable => Double.NaN
           }
         }
         getQuerier.sendQueryResponse(new Prediction(getNetworkID(), forecastingPoint.toDataInstance, prediction))
@@ -95,6 +100,7 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
    */
   override def updateModel(mDesc: ParameterDescriptor): Unit = {
     try {
+
       val spt: Int = {
         try {
           splits(getCurrentCaller)
@@ -105,22 +111,36 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
             splits(getCurrentCaller)
         }
       }
-      if (getNumberOfHubs == 1)
-        if (spt == 1)
-          if (isWarmedUp)
-            updateCenterVariable(mDesc)
+
+      if (mDesc.getParams != null)
+        if (getNumberOfHubs == 1)
+          if (spt == 1)
+            if (isWarmedUp)
+              updateCenterVariable(mDesc)
+            else
+              warmModel(mDesc)
           else
-            warmModel(mDesc)
+            updateParameterTree(spt, mDesc, updateCenterVariable)
         else
           updateParameterTree(spt, mDesc, updateCenterVariable)
       else
-        updateParameterTree(spt, mDesc, updateCenterVariable)
+        assertWarmup()
+
     } catch {
       case e: Throwable =>
         e.printStackTrace()
         throw new RuntimeException("Something went wrong while updating the center model of worker " +
           getNodeId + " of MLPipeline " + getNetworkID + ".")
     }
+  }
+
+  def assertWarmup(): Unit = {
+    assert(
+      getNodeId == 0 &&
+        getMLPipeline.getFittedData == getMiniBatchSize * miniBatches &&
+        isBlocked
+    )
+    unblockStream()
   }
 
   def updateCenterVariable(mDesc: ParameterDescriptor): Unit = {

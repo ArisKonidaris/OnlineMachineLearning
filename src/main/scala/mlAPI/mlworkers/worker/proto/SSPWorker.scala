@@ -64,6 +64,7 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
+        blockStream()
       } else {
         incrementClock()
         if (clock - min > s)
@@ -87,10 +88,14 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
-        val prediction = {
-          mlPipeline.predict(forecastingPoint) match {
-            case Some(prediction: Double) => prediction
-            case None => Double.MaxValue
+        val prediction: Double = {
+          try {
+            globalModel.predict(forecastingPoint) match {
+              case Some(prediction: Double) => prediction
+              case None => Double.NaN
+            }
+          } catch {
+            case _: Throwable => Double.NaN
           }
         }
         getQuerier.sendQueryResponse(new Prediction(getNetworkID(), forecastingPoint.toDataInstance, prediction))
@@ -123,19 +128,23 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
             splits(getCurrentCaller)
         }
       }
-      if (getNumberOfHubs == 1)
-        if (spt == 1)
-          if (isWarmedUp)
-            updateModels(mDesc)
+
+      if (mDesc.getParams != null) {
+        if (getNumberOfHubs == 1)
+          if (spt == 1)
+            if (isWarmedUp)
+              updateModels(mDesc)
+            else
+              warmModel(mDesc)
           else
-            warmModel(mDesc)
+            updateParameterTree(spt, mDesc, updateModels)
         else
           updateParameterTree(spt, mDesc, updateModels)
-      else
-        updateParameterTree(spt, mDesc, updateModels)
 
-      if (mDesc.getMiscellaneous != null && mDesc.getMiscellaneous(0).isInstanceOf[LongWrapper])
-        min = mDesc.getMiscellaneous(0).asInstanceOf[LongWrapper].getLong
+        if (mDesc.getMiscellaneous != null && mDesc.getMiscellaneous(0).isInstanceOf[LongWrapper])
+          min = mDesc.getMiscellaneous(0).asInstanceOf[LongWrapper].getLong
+      } else
+        assertWarmup()
 
     } catch {
       case e: Throwable =>
@@ -143,6 +152,15 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
         throw new RuntimeException("Something went wrong while updating the local model of worker " +
           getNodeId + " of MLPipeline " + getNetworkID + ".")
     }
+  }
+
+  def assertWarmup(): Unit = {
+    assert(
+      getNodeId == 0 &&
+        getMLPipeline.getFittedData == getMiniBatchSize * miniBatches &&
+        isBlocked
+    )
+    unblockStream()
   }
 
   /** This method responds to a query for the Machine Learning worker.

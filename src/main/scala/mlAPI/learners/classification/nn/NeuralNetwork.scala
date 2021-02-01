@@ -302,7 +302,7 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
     for ((parameter, value) <- structureMap) {
       parameter match {
         case "config" =>
-          if (inputShape != null && inputShape.nonEmpty && numOfClasses != null) {
+          if (inputShape != null && inputShape.nonEmpty && numOfClasses != 0) {
             try {
               confFromJson(value.asInstanceOf[String], inputShape, numOfClasses)
             } catch {

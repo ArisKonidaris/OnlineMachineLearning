@@ -37,10 +37,14 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
-        val prediction = {
-          mlPipeline.predict(forecastingPoint) match {
-            case Some(prediction: Double) => prediction
-            case None => Double.MaxValue
+        val prediction: Double = {
+          try {
+            globalModel.predict(forecastingPoint) match {
+              case Some(prediction: Double) => prediction
+              case None => Double.NaN
+            }
+          } catch {
+            case _: Throwable => Double.NaN
           }
         }
         getQuerier.sendQueryResponse(new Prediction(getNetworkID(), forecastingPoint.toDataInstance, prediction))

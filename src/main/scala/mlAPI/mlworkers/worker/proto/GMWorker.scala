@@ -93,10 +93,14 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
-        val prediction = {
-          mlPipeline.predict(forecastingPoint) match {
-            case Some(prediction: Double) => prediction
-            case None => Double.MaxValue
+        val prediction: Double = {
+          try {
+            globalModel.predict(forecastingPoint) match {
+              case Some(prediction: Double) => prediction
+              case None => Double.NaN
+            }
+          } catch {
+            case _: Throwable => Double.NaN
           }
         }
         getQuerier.sendQueryResponse(new Prediction(getNetworkID(), forecastingPoint.toDataInstance, prediction))
@@ -132,16 +136,14 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
       }
 
       // Update models.
-      if (spt == 1)
-        if (isWarmedUp)
-          if (mDesc.getParams != null)
+      if (mDesc.getParams != null)
+        if (spt == 1)
+          if (isWarmedUp)
             updateModels(mDesc)
           else
-            assertWarmup()
+            warmModel(mDesc)
         else
-          warmModel(mDesc)
-      else if (mDesc.getParams != null)
-        updateParameterTree(spt, mDesc, updateModels)
+          updateParameterTree(spt, mDesc, updateModels)
       else
         assertWarmup()
 

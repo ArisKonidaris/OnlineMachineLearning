@@ -60,6 +60,7 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).updateModel(slice)
+    getProxy(0).updateModel(ParameterDescriptor(null, null, null, null, null, null))
   }
 
   /** A method used by the workers for requesting the global model from the parameter server(s). */
