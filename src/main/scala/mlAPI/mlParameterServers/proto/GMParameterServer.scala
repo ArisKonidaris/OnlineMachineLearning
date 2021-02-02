@@ -24,9 +24,6 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
   /** A helping counter. */
   private var counter: Int = 0
 
-  /** The radius of the admissible region ball. */
-  private var radius: Double = 0.0008
-
   /** A breeze vector. */
   private var vector: BreezeDenseVector[Double] = _
 
@@ -158,20 +155,5 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
    */
   @QueryOp
   def query(queryId: Long, queryTarget: Int, predicates: Array[java.io.Serializable]): Unit = ()
-
-  def getRadius: Double = radius
-
-  def setRadius(radius: Double): Unit = this.radius = radius
-
-  override def configureParameterServer(request: Request): GMParameterServer = {
-
-    // Setting the ML Hub.
-    val config: mutable.Map[String, AnyRef] = request.getTrainingConfiguration.asScala
-
-    if (config.contains("radius"))
-      setRadius(Parsing.DoubleParsing(config, "radius", 0.0008))
-
-    this
-  }
 
 }

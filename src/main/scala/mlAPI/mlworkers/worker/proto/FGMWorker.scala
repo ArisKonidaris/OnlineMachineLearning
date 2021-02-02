@@ -106,8 +106,11 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
     data match {
-      case TrainingPoint(trainingPoint) => train(trainingPoint)
+      case TrainingPoint(trainingPoint) =>
+        println(getNodeId + " TrainingPoint")
+        train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
+        println(getNodeId + " ForecastingPoint")
         val prediction: Double = {
           try {
             globalModel.predict(forecastingPoint) match {
@@ -149,6 +152,13 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   override def requestZeta(): Unit = {
     println("Zeta has been requested from worker " + getNodeId)
     activeSubRound = false // Stop calculating and sending increments.
+    try {
+
+    } catch {
+      case e: Throwable =>
+        println("---> " + getNodeId)
+        e.printStackTrace()
+    }
     tempZeta = safeZone.zeta(
       getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
       getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
@@ -175,7 +185,6 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
    * @param mDesc The piece of the new model and the new quantum send by the hub in order to start a new FGM round.
    */
   override def newRound(mDesc: ParameterDescriptor): Unit = {
-    //    println(getNodeId + " --> newRound")
     try {
 
       // Initialize splits.
