@@ -73,8 +73,8 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
       if (!violatedAR && processedData % (getMiniBatchSize * miniBatches) == 0)
         if (math.pow(
           (
-            getGlobalParams.asInstanceOf[Option[VectoredParameters]].get -
-              getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
+            getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get -
+            getGlobalParams.asInstanceOf[Option[VectoredParameters]].get
             ).asInstanceOf[VectoredParameters].frobeniusNorm,
           2) > radius
         ) {
@@ -160,6 +160,8 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     round += 1
     processedData = 0
     violatedAR = false
+    if (mDesc.getFitted != null)
+      mlPipeline.setFittedData(mDesc.getFitted.getLong)
     println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + round)
   }
 

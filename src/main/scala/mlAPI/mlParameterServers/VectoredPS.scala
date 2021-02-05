@@ -4,7 +4,7 @@ import BipartiteTopologyAPI.futures.Response
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.math.{DenseVector, SparseVector}
 import mlAPI.parameters.utils.{Bucket, ParameterDescriptor}
-import mlAPI.protocols.{IntWrapper, QuantilesWrapper}
+import mlAPI.protocols.{IntWrapper, LongWrapper, QuantilesWrapper}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -162,6 +162,7 @@ abstract class VectoredPS[WorkerIfc, QueryIfc] extends MLParameterServer[WorkerI
         null
       )
     }
+    model.head.setFitted(LongWrapper(fitted))
     model.toArray
   }
 

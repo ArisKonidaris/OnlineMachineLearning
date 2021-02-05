@@ -177,7 +177,7 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     new LearnerPOJO("HoeffdingTree",
       null,
       null,
-      Map[String, AnyRef](("serializedHT",tree.ht.serialize)).asJava
+      Map[String, AnyRef](("serializedHT",tree.ht.serialize.toString)).asJava
     )
   }
 

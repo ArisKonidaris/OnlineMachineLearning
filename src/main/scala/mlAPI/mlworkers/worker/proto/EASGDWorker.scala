@@ -146,6 +146,8 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
   def updateCenterVariable(mDesc: ParameterDescriptor): Unit = {
     if (mDesc.getParamSizes == null)
       mDesc.setParamSizes(getMLPipeline.getLearner.getParameters.get.sizes)
+    if (mDesc.getFitted != null)
+      mlPipeline.setFittedData(mDesc.getFitted.getLong)
     setGlobalModelParams(mDesc)
     val dif = getMLPipelineParams.get.asInstanceOf[VectoredParameters] - getGlobalParams.get.asInstanceOf[VectoredParameters]
     getMLPipelineParams.get.asInstanceOf[VectoredParameters] -=

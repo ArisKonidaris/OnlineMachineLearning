@@ -1,18 +1,25 @@
 package mlAPI.math
 
-import ControlAPI.DataInstance
+import ControlAPI.{CountableSerial, DataInstance}
 import com.fasterxml.jackson.databind.ObjectMapper
 
 /**
  * A trait representing a data point required for
  * machine learning tasks.
  */
-trait Point extends Serializable {
+trait Point extends CountableSerial {
 
   var numericVector: Vector
   var discreteVector: Vector
   var categoricalVector: Array[String]
   var dataInstance: String
+
+  override def getSize: Int = {
+    { if (numericVector != null) numericVector.size * 8 else 0 } +
+      { if (discreteVector != null) discreteVector.size * 8 else 0 } +
+      { if (categoricalVector != null) (for (c <- categoricalVector) yield c.length * 8).sum else 0 } +
+      { if (dataInstance != null) dataInstance.length * 8 else 0 }
+  }
 
   def validDiscreteVector: Boolean = {
     if (discreteVector.size == 0)

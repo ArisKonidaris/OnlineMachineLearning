@@ -209,6 +209,8 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def updateModels(mDesc: ParameterDescriptor): Unit = {
     if (mDesc.getParamSizes == null)
       mDesc.setParamSizes(getMLPipeline.getLearner.getParameters.get.sizes)
+    if (mDesc.getFitted != null)
+      mlPipeline.setFittedData(mDesc.getFitted.getLong)
     setGlobalModelParams(mDesc)
     setMLPipelineParams(getGlobalParams.get.getCopy)
   }
@@ -219,6 +221,8 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
     setGlobalModelParams(mDesc)
     setMLPipelineParams(mDesc)
     assert(isBlocked)
+    if (mDesc.getFitted != null)
+      mlPipeline.setFittedData(mDesc.getFitted.getLong)
     unblockStream()
   }
 

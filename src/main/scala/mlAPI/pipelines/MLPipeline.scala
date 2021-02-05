@@ -5,7 +5,8 @@ import ControlAPI.{TransformerPOJO => POJOTransformer}
 import mlAPI.math.LearningPoint
 import mlAPI.learners.Learner
 import mlAPI.learners.classification.nn.NeuralNetwork
-import mlAPI.learners.classification.{MultiClassPA, PA, SVM}
+import mlAPI.learners.classification.{HoeffdingTreeClassifier, MultiClassPA, PA, SVM}
+import mlAPI.learners.clustering.KMeans
 import mlAPI.learners.regression.{ORR, RegressorPA}
 import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, WithParams, WrappedVectoredParameters}
 import mlAPI.parameters.{HTParameters, VectoredParameters}
@@ -103,6 +104,8 @@ case class MLPipeline(private var preprocess: ListBuffer[Preprocessor], private 
       case "RegressorPA" => learner = new RegressorPA
       case "ORR" => learner = new ORR
       case "NN" => learner = NeuralNetwork()
+      case "HT" => learner = HoeffdingTreeClassifier()
+      case "K-means" => learner = KMeans()
       case _ => None
     }
     learner

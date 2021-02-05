@@ -219,6 +219,8 @@ abstract class VectoredWorker[ProxyIfc, QueryIfc]() extends MLWorker[ProxyIfc, Q
     if (!parameterTree.contains(getCurrentCaller))
       parameterTree.put(getCurrentCaller, new mutable.TreeMap[(Int, Int), ParameterDescriptor]())
     parameterTree(getCurrentCaller).put((mDesc.getBucket.getStart.toInt, mDesc.getBucket.getEnd.toInt), mDesc)
+    if (mDesc.getFitted != null)
+      mlPipeline.setFittedData(mDesc.getFitted.getLong)
     if (slices == parameterTree(getCurrentCaller).size) {
       reconstructHubSubVector()
       if (readySplitModels == getNumberOfHubs)

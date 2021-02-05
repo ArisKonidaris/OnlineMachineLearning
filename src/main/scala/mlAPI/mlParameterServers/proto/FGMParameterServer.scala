@@ -152,10 +152,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       if (inc > parallelism) {
         phi = 0.0
         activeSubRound = false
-        println("-> BROADCAST REQUEST ZETA")
         getBroadcastProxy.requestZeta()
-//        for (worker <- 0 until parallelism)
-//          getProxy(worker).requestZeta()
       }
     }
   }

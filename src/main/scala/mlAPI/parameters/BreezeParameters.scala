@@ -37,16 +37,6 @@ trait BreezeParameters extends VectoredParameters {
 
   override def slice(range: Bucket, sparse: Boolean = false): Vector = {
     sliceRequirements(range)
-//    val flatVector: BreezeDenseVector[Double] = {
-//      if (range.getLength == size)
-//        flatten
-//      else
-//        flatten(range.getStart.toInt to range.getEnd.toInt).copy
-//    }
-//    if (sparse)
-//      SparseVector.sparseVectorConverter.convert(flatVector)
-//    else
-//      DenseVector.denseVectorConverter.convert(flatVector)
     val flatVector: Array[Double] = {
       if (range.getLength == size)
         flatten.data

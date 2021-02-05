@@ -106,11 +106,8 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
     data match {
-      case TrainingPoint(trainingPoint) =>
-        println(getNodeId + " TrainingPoint")
-        train(trainingPoint)
+      case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
-        println(getNodeId + " ForecastingPoint")
         val prediction: Double = {
           try {
             globalModel.predict(forecastingPoint) match {
