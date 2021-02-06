@@ -43,6 +43,12 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   /** The current FGM round. */
   private var round: Long = 0
 
+  /**
+   * A flag determining if the coordinator requested the local model when it is not yet initialized or received by this
+   * worker in the first place.
+   */
+  var pendingModel: Boolean = false
+
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
   def init(): Unit = {
@@ -147,20 +153,17 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
 
   /** Sending the safe zone function value to the coordinator. */
   override def requestZeta(): Unit = {
-    println("Zeta has been requested from worker " + getNodeId)
-    activeSubRound = false // Stop calculating and sending increments.
-    try {
-
-    } catch {
-      case e: Throwable =>
-        println("---> " + getNodeId)
-        e.printStackTrace()
+    getMLPipelineParams match {
+      case None => pendingModel = true
+      case Some(_) =>
+        println("Zeta has been requested from worker " + getNodeId)
+        activeSubRound = false // Stop calculating and sending increments.
+        tempZeta = safeZone.zeta(
+          getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
+          getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
+        )
+        getProxy(0).receiveZeta(ZetaValue(tempZeta))
     }
-    tempZeta = safeZone.zeta(
-      getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
-      getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
-    )
-    getProxy(0).receiveZeta(ZetaValue(tempZeta))
   }
 
   /** Receive the new quantum from the coordinator in order to resume the FGM round.
@@ -218,6 +221,22 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
         e.printStackTrace()
         throw new RuntimeException("Something went wrong while resetting worker " +
           getNodeId + " of MLPipeline " + getNetworkID + " for a new FGM round.")
+    }
+  }
+
+  override def warmModel(mDesc: ParameterDescriptor): Unit = {
+    super.warmModel(mDesc)
+    if (pendingModel) {
+      pendingModel = false
+      requestZeta()
+    }
+  }
+
+  override def updateModels(mDesc: ParameterDescriptor): Unit = {
+    super.updateModels(mDesc)
+    if (pendingModel) {
+      pendingModel = false
+      requestZeta()
     }
   }
 

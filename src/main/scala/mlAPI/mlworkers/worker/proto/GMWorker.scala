@@ -29,6 +29,12 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
   /** A variable indicating the current round of the GM protocol. */
   var round: Long = 0
 
+  /**
+   * A flag determining if the coordinator requested the local model when it is not yet initialized or received by this
+   * worker in the first place.
+   */
+  var pendingModel: Boolean = false
+
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
   def init(): Unit = {
@@ -110,8 +116,12 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
   /** Sending the local model to the coordinator. */
   override def sendLocalModel(): Unit = {
     println("Requested local model " + getNodeId)
-    for (slice <- ModelMarshalling(model = getMLPipelineParams.get)(0))
-      getProxy(0).receiveLocalModel(slice).toSync(updateModel)
+    getMLPipelineParams match {
+      case None => pendingModel = true
+      case Some(_) =>
+        for (slice <- ModelMarshalling(model = getMLPipelineParams.get)(0))
+          getProxy(0).receiveLocalModel(slice).toSync(updateModel)
+    }
   }
 
   /**
@@ -155,6 +165,14 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     }
   }
 
+  override def warmModel(mDesc: ParameterDescriptor): Unit = {
+    super.warmModel(mDesc)
+    if (pendingModel) {
+      pendingModel = false
+      sendLocalModel()
+    }
+  }
+
   override def updateModels(mDesc: ParameterDescriptor) {
     super.updateModels(mDesc)
     round += 1
@@ -163,6 +181,10 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     if (mDesc.getFitted != null)
       mlPipeline.setFittedData(mDesc.getFitted.getLong)
     println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + round)
+    if (pendingModel) {
+      pendingModel = false
+      sendLocalModel()
+    }
   }
 
   def assertWarmup(): Unit = {
