@@ -37,7 +37,13 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
 
   /** A method for training the asynchronous worker on a training data point. */
   def train(data: LearningPoint): Unit = {
-    fit(data)
+    try {
+      fit(data)
+    } catch {
+      case e: Throwable =>
+        println(getNodeId + ", " + processedData + ", " + getMiniBatchSize + ", " + miniBatches)
+        e.printStackTrace()
+    }
     if (processedData >= getMiniBatchSize * miniBatches)
       if (!isWarmedUp && getNodeId == 0) {
         val warmupModel = {
