@@ -2,17 +2,14 @@ package mlAPI.mlParameterServers.proto
 
 import BipartiteTopologyAPI.annotations.{InitOp, MergeOp, ProcessOp, QueryOp}
 import BipartiteTopologyAPI.futures.Response
-import ControlAPI.Request
 import mlAPI.mlParameterServers.VectoredPS
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.utils.ParameterDescriptor
 import mlAPI.protocols.dynamic.{GMHubInterface, GMRemoteLearner}
 import mlAPI.protocols.statistics.GMStatistics
-import mlAPI.utils.Parsing
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 
 import java.io.Serializable
-import scala.collection.mutable
 import scala.collection.JavaConverters._
 
 case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with GMHubInterface {
@@ -77,7 +74,8 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).updateModel(slice)
-    getProxy(0).updateModel(ParameterDescriptor(null, null, null, null, null, null))
+    if (getNodeId == 0)
+      getProxy(0).updateModel(ParameterDescriptor(null, null, null, null, null, null))
   }
 
   /** THis method is called by a worker when its admissible regin has been violated. */
@@ -97,7 +95,7 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
   override def receiveLocalModel(mDesc: ParameterDescriptor): Response[ParameterDescriptor] = {
     protocolStatistics.updateBytesShipped(mDesc.getSize)
     if (updateParameterTree(mDesc)) {
-      println("---> Got model " + getCurrentCaller)
+//      println("---> Got model " + getCurrentCaller)
       protocolStatistics.updateModelsShipped()
       protocolStatistics.updateNumOfBlocks()
       counter += 1

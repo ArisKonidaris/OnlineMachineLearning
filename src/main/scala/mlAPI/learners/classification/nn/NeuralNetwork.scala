@@ -153,20 +153,11 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
   }
 
   def getMiniBatch: DataSet = {
-    try {
-      println("inputShape: " + inputShape.mkString("Array(", ", ", ")"))
-      println("s: " + inputShape.updated(0, miniBatchSize).mkString("Array(", ", ", ")"))
-      println("batchX.length: " + batchX.length)
-      val X = Nd4j.create(batchX.toArray, inputShape.updated(0, miniBatchSize))
-      val Y = Nd4j.create(batchY.toArray, Array(miniBatchSize, numOfClasses))
-      batchX.clear()
-      batchY.clear()
-      new DataSet(X, Y)
-    } catch {
-      case e: Throwable =>
-        e.printStackTrace()
-        throw new RuntimeException
-    }
+    val X = Nd4j.create(batchX.toArray, inputShape.updated(0, miniBatchSize))
+    val Y = Nd4j.create(batchY.toArray, Array(miniBatchSize, numOfClasses))
+    batchX.clear()
+    batchY.clear()
+    new DataSet(X, Y)
   }
 
   def fitMiniBatch(): Unit = {

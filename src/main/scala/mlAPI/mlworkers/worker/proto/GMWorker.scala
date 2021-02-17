@@ -38,7 +38,6 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
   def init(): Unit = {
-    assert(getNumberOfHubs == 1)
     println("Network: " + getNetworkID + "| GM Worker " + getNodeId + " initialized.")
     if (getNodeId != 0) {
       round += 1
@@ -58,36 +57,39 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
   def train(data: LearningPoint): Unit = {
     fit(data)
     if (!isWarmedUp) {
-      if (processedData >= getMiniBatchSize * miniBatches) {
-        if (!isWarmedUp && getNodeId == 0) {
-          val warmupModel = {
-            val wrapped = getMLPipelineParams.get.extractParams(
-              getMLPipelineParams.get.asInstanceOf[VectoredParameters],
-              false
-            ).asInstanceOf[WrappedVectoredParameters]
-            ParameterDescriptor(wrapped.getSizes, wrapped.getData, null, null, null, null)
-          }
-          setWarmed(true)
-          setGlobalModelParams(warmupModel)
-          for (slice <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)(0))
-            getProxy(0).endWarmup(slice)
-          processedData = 0
-          blockStream()
+      if (getNodeId == 0 && (processedData % (getMiniBatchSize * miniBatches) == 0)) {
+        val warmupModel = {
+          val wrapped = getMLPipelineParams.get.extractParams(
+            getMLPipelineParams.get.asInstanceOf[VectoredParameters],
+            false
+          ).asInstanceOf[WrappedVectoredParameters]
+          ParameterDescriptor(wrapped.getSizes, wrapped.getData, null, null, null, null)
         }
+        setWarmed(true)
+        setGlobalModelParams(warmupModel)
+        val sWarmupModel = ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)
+        for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sWarmupModel.zipWithIndex)
+          for (slice <- hubSubVector)
+            getProxy(index).endWarmup(slice)
+        processedData = 0
+        blockStream()
       }
     } else {
-      if (!violatedAR && processedData % (getMiniBatchSize * miniBatches) == 0)
-        if (math.pow(
-          (
-            getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get -
-            getGlobalParams.asInstanceOf[Option[VectoredParameters]].get
-            ).asInstanceOf[VectoredParameters].frobeniusNorm,
-          2) > radius
-        ) {
-          violatedAR = true
-          getProxy(0).violation()
-        }
+      if (!violatedAR && (processedData % (getMiniBatchSize * miniBatches) == 0) && violation) {
+        violatedAR = true
+        getProxy(0).violation()
+      }
     }
+  }
+
+  def violation: Boolean = {
+    math.pow(
+      (
+        getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get -
+          getGlobalParams.asInstanceOf[Option[VectoredParameters]].get
+        ).asInstanceOf[VectoredParameters].frobeniusNorm,
+      2
+    ) > radius
   }
 
   /** The consumption of a data point by the Machine Learning FGM worker.
@@ -96,6 +98,7 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
+    assert(isWarmedUp || (!isWarmedUp && getNodeId == 0))
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
@@ -119,8 +122,9 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     getMLPipelineParams match {
       case None => pendingModel = true
       case Some(_) =>
-        for (slice <- ModelMarshalling(model = getMLPipelineParams.get)(0))
-          getProxy(0).receiveLocalModel(slice).toSync(updateModel)
+        for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getMLPipelineParams.get).zipWithIndex)
+          for (slice <- hubSubVec)
+            getProxy(index).receiveLocalModel(slice).toSync(updateModel)
     }
   }
 
@@ -147,11 +151,14 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
 
       // Update models.
       if (mDesc.getParams != null)
-        if (spt == 1)
-          if (isWarmedUp)
-            updateModels(mDesc)
+        if (getNumberOfHubs == 1)
+          if (spt == 1)
+            if (isWarmedUp)
+              updateModels(mDesc)
+            else
+              warmModel(mDesc)
           else
-            warmModel(mDesc)
+            updateParameterTree(spt, mDesc, updateModels)
         else
           updateParameterTree(spt, mDesc, updateModels)
       else

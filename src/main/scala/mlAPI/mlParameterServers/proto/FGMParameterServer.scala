@@ -38,14 +38,8 @@ case class FGMParameterServer(private var precision: Double = 0.01,
   /** The increment of a sub-round. */
   var inc: Long = 0L
 
-  /** Number of safe zones sent by the FGM coordinator. */
-  var safeZonesSent: Long = 0L
-
   /** The phi value of the FMG distributed learning protocol. */
-  var phi: Double = 0D
-
-  /** The quantum of the FMG distributed learning protocol. */
-  var quantum: Double = 0D
+  var psi: Double = 0D
 
   /** The smallest number the zeta function can reach. */
   var barrier: Double = 0D
@@ -70,6 +64,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    *         learning procedure.
    * */
   override def endWarmup(mDesc: ParameterDescriptor): Unit = {
+    assert(!isWarmedUp)
     protocolStatistics.updateBytesShipped(mDesc.getSize)
     if (updateParameterTree(mDesc)) {
       protocolStatistics.updateModelsShipped()
@@ -96,36 +91,24 @@ case class FGMParameterServer(private var precision: Double = 0.01,
   def warmWorkers(): Unit = {
     prepareNewRound()
     val model = warmUpModel()
-    if (model.last.getMiscellaneous != null)
-      model.last.setMiscellaneous(model.last.getMiscellaneous ++ Array(Quantum(quantum)))
-    else
-      model.last.setMiscellaneous(Array(Quantum(quantum)))
     protocolStatistics.updateModelsShipped(parallelism - 1)
     protocolStatistics.updateBytesShipped((parallelism - 1) * (for (slice <- model) yield slice.getSize).sum)
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).newRound(slice)
-    protocolStatistics.updateBytesShipped(Quantum(quantum).getSize)
-    getProxy(0).newRound(ParameterDescriptor(null, null, null, null, Array(Quantum(quantum)), null))
+    if (getNodeId == 0)
+      getProxy(0).newRound(ParameterDescriptor(null, null, null, null, null, null))
   }
 
   /** This method prepares the FGM network for a new round. */
   def prepareNewRound(): Unit = {
-
-    // Resets
     shippedDrifts.clear()
     drift *= 0.0
     activeSubRound = true
-
-    // Calculating the new phi, quantum and the minimum acceptable value for phi.
-    phi = parallelism * safeZone.newRoundZeta()
-    quantum = phi / (2.0 * parallelism)
-    barrier = precision * phi
-
-    // Increment the number of rounds, sub-rounds and number of shipped safe zones of the FGM distributed learning protocol.
+    if (getNodeId == 0)
+      barrier = -1D
     protocolStatistics.asInstanceOf[FGMStatistics].updateNumOfRounds()
     protocolStatistics.asInstanceOf[FGMStatistics].updateNumOfSubRounds()
-    safeZonesSent += parallelism
   }
 
   /** Starting a new round of the FGM distributed learning protocol.
@@ -135,7 +118,6 @@ case class FGMParameterServer(private var precision: Double = 0.01,
   def startRound(): Response[ParameterDescriptor] = {
     prepareNewRound()
     val model = serializableModel()
-    model.last.setMiscellaneous(Array(Quantum(quantum)))
     protocolStatistics.updateBytesShipped(parallelism * (for (slice <- model) yield slice.getSize).sum)
     protocolStatistics.updateModelsShipped(parallelism)
     fulfillBroadcastPromises(model.toList.asJava)
@@ -146,11 +128,12 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * @param increment The increment send by the worker.
    * */
   override def receiveIncrement(increment: Increment): Unit = {
+    assert(getNodeId == 0)
     protocolStatistics.updateBytesShipped(increment.getSize)
     if (activeSubRound && protocolStatistics.asInstanceOf[FGMStatistics].getNumOfSubRounds == increment.subRound) {
       inc += increment.getIncrement
       if (inc > parallelism) {
-        phi = 0.0
+        psi = 0D
         activeSubRound = false
         getBroadcastProxy.requestZeta()
       }
@@ -162,15 +145,17 @@ case class FGMParameterServer(private var precision: Double = 0.01,
    * @param zeta The zeta safe zone function value sent by the worker.
    * */
   override def receiveZeta(zeta: ZetaValue): Unit = {
+    assert(getNodeId == 0)
     protocolStatistics.updateBytesShipped(zeta.getSize)
-    phi += zeta.getValue
+    psi += zeta.getValue
     shippedZetas += getCurrentCaller
+    if (barrier == -1 && zeta.getPhi != null)
+      barrier = precision * zeta.getPhi.getDouble
     if (shippedZetas.length == parallelism) {
       shippedZetas.clear()
-      inc = 0
-      if (phi > barrier) {
-        quantum = phi / (2.0 * parallelism)
-        newSubRound(quantum)
+      inc = 0L
+      if (psi > barrier) {
+        newSubRound(psi / (2D * parallelism))
         activeSubRound = true
       } else
         getBroadcastProxy.sendLocalDrift()

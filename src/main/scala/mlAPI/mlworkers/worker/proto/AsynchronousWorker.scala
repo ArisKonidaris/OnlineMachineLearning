@@ -64,6 +64,7 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
+    assert(isWarmedUp || (!isWarmedUp && getNodeId == 0))
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
@@ -106,6 +107,7 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
         }
       }
 
+      // Update models.
       if (mDesc.getParams != null)
         if (getNumberOfHubs == 1)
           if (spt == 1)

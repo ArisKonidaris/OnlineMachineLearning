@@ -85,6 +85,7 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
+    assert(isWarmedUp || (!isWarmedUp && getNodeId == 0))
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>

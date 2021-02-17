@@ -7,7 +7,7 @@ import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.mlworkers.worker.{MLWorker, VectoredWorker}
 import mlAPI.parameters.VectoredParameters
 import mlAPI.parameters.utils.{ParameterDescriptor, WrappedVectoredParameters}
-import mlAPI.protocols.IntWrapper
+import mlAPI.protocols.{DoubleWrapper, IntWrapper}
 import mlAPI.protocols.dynamic._
 import mlAPI.safezones.{SafeZone, VarianceSafeZone}
 import mlAPI.utils.Parsing
@@ -49,10 +49,12 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
    */
   var pendingModel: Boolean = false
 
+  /** A flag determining whether the initial phi of a new round has been sent to the hub. */
+  var sentPhi: Boolean = false
+
   /** Initialization method of the Machine Learning worker node. */
   @InitOp
   def init(): Unit = {
-    assert(getNumberOfHubs == 1)
     println("Network: " + getNetworkID + "| FGM Worker " + getNodeId + " initialized.")
     if (getNodeId != 0)
       pull()
@@ -70,36 +72,30 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   def train(data: LearningPoint): Unit = {
     fit(data)
     if (!isWarmedUp) {
-      if (processedData >= getMiniBatchSize * miniBatches) {
-        if (!isWarmedUp && getNodeId == 0) {
-          val warmupModel = {
-            val wrapped = getMLPipelineParams.get.extractParams(
-              getMLPipelineParams.get.asInstanceOf[VectoredParameters],
-              false
-            ).asInstanceOf[WrappedVectoredParameters]
-            ParameterDescriptor(wrapped.getSizes, wrapped.getData, null, null, null, null)
-          }
-          setWarmed(true)
-          setGlobalModelParams(warmupModel)
-          for (slice <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)(0))
-            getProxy(0).endWarmup(slice)
-          processedData = 0
-          blockStream()
+      if (getNodeId == 0 && (processedData % (getMiniBatchSize * miniBatches) == 0)) {
+        val warmupModel = {
+          val wrapped = getMLPipelineParams.get.extractParams(
+            getMLPipelineParams.get.asInstanceOf[VectoredParameters],
+            false
+          ).asInstanceOf[WrappedVectoredParameters]
+          ParameterDescriptor(wrapped.getSizes, wrapped.getData, null, null, null, null)
         }
+        setWarmed(true)
+        setGlobalModelParams(warmupModel)
+        val sWarmupModel = ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)
+        for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sWarmupModel.zipWithIndex)
+          for (slice <- hubSubVector)
+            getProxy(index).endWarmup(slice)
+        processedData = 0
+        blockStream()
       }
     } else {
-      if (activeSubRound && (processedData % (getMiniBatchSize * miniBatches) == 0)) {
-        if (subRound > 0) { // Check distance from the safe zone boundary
-          val z = safeZone.zeta(
-            getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
-            getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
-          )
-          val distFromBoundary: Long = scala.math.floor((zeta - z) / quantum).toLong
-          val increment: Long = distFromBoundary - counter
-          if (increment > 0) {
-            counter = distFromBoundary
-            getProxy(0).receiveIncrement(Increment(increment, subRound))
-          }
+      if (activeSubRound && subRound > 0 && (processedData % (getMiniBatchSize * miniBatches) == 0)) {
+        val distFromBoundary: Long = scala.math.floor((zeta - getZeta) / quantum).toLong
+        val increment: Long = distFromBoundary - counter
+        if (increment > 0) {
+          counter = distFromBoundary
+          getProxy(0).receiveIncrement(Increment(increment, subRound))
         }
       }
     }
@@ -111,6 +107,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
+    assert(isWarmedUp || (!isWarmedUp && getNodeId == 0))
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
@@ -128,26 +125,25 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
     }
   }
 
-  /**
-   * Resets the local variables of the worker for starting a new FGM round.
-   *
-   * @param quantum The quantum of the new round.
-   */
-  def reset(quantum: Double): Unit = {
+  /** Resets the local variables of the worker for starting a new FGM round. */
+  def reset(): Unit = {
     zeta = safeZone.newRoundZeta() // Reset the safe zone function to E.
     counter = 0 // Reset the worker counter.
-    this.quantum = quantum // Update the quantum.
+    this.quantum = zeta / 2.0 // Update the quantum.
     activeSubRound = true // Reset the active sub round flag.
     subRound += 1 // Update the current running subround.
     round += 1 // Update the current running round.
+    if (getNodeId == 0)
+      sentPhi = false // Reset the sent phi flag.
     println("Network: " + getNetworkID + "| Worker: " + getNodeId + " started new round: " + round + ", zeta: " + zeta)
   }
 
   /** Sending the local model to the coordinator. */
   override def sendLocalDrift(): Unit = {
     assert(!activeSubRound)
-    for (slice <- ModelMarshalling(model = getDeltaVector)(0))
-      getProxy(0).receiveLocalDrift(slice).toSync(newRound)
+    for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex)
+      for (slice <- hubSubVec)
+        getProxy(index).receiveLocalDrift(slice).toSync(newRound)
     processedData = 0
   }
 
@@ -156,13 +152,15 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
     getMLPipelineParams match {
       case None => pendingModel = true
       case Some(_) =>
-        println("Zeta has been requested from worker " + getNodeId)
+//        println("Zeta has been requested from worker " + getNodeId)
         activeSubRound = false // Stop calculating and sending increments.
-        tempZeta = safeZone.zeta(
-          getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
-          getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
+        getProxy(0).receiveZeta(
+          if (getNodeId == 0 && !sentPhi) {
+            sentPhi = true
+            ZetaValue(getZeta, DoubleWrapper(getNumberOfSpokes * zeta))
+          } else
+            new ZetaValue(getZeta)
         )
-        getProxy(0).receiveZeta(ZetaValue(tempZeta))
     }
   }
 
@@ -173,16 +171,15 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   override def receiveQuantum(quantum: Quantum): Unit = {
     counter = 0 // Reset the worker counter.
     this.quantum = quantum.getValue // Update the quantum.
-    zeta = tempZeta // Update zeta.
+    zeta = getZeta // Update zeta.
     activeSubRound = true // Resume calculating and sending increments.
     subRound += 1 // Update the current running subround.
   }
 
   /**
-   * A method called each type the new global model
-   * (or a slice of it) arrives from a parameter server.
+   * A method called each time the new global model (or a slice of it) arrives from a parameter server.
    *
-   * @param mDesc The piece of the new model and the new quantum send by the hub in order to start a new FGM round.
+   * @param mDesc The piece of the new model sent by the hub.
    */
   override def newRound(mDesc: ParameterDescriptor): Unit = {
     try {
@@ -201,20 +198,18 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
 
       // Update models.
       if (mDesc.getParams != null)
-        if (spt == 1)
-          if (isWarmedUp)
-            updateModels(mDesc)
+        if (getNumberOfHubs == 1)
+          if (spt == 1)
+            if (isWarmedUp)
+              updateModels(mDesc)
+            else
+              warmModel(mDesc)
           else
-            warmModel(mDesc)
+            updateParameterTree(spt, mDesc, updateModels)
         else
           updateParameterTree(spt, mDesc, updateModels)
       else
-        assertWarmup(mDesc)
-
-      // Reset round.
-      if (mDesc.getMiscellaneous != null && mDesc.getMiscellaneous.last.isInstanceOf[Quantum]) {
-        reset(mDesc.getMiscellaneous.last.asInstanceOf[Quantum].getValue)
-      }
+        assertWarmup()
 
     } catch {
       case e: Throwable =>
@@ -226,6 +221,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
 
   override def warmModel(mDesc: ParameterDescriptor): Unit = {
     super.warmModel(mDesc)
+    reset()
     if (pendingModel) {
       pendingModel = false
       requestZeta()
@@ -234,20 +230,16 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
 
   override def updateModels(mDesc: ParameterDescriptor): Unit = {
     super.updateModels(mDesc)
+    reset()
     if (pendingModel) {
       pendingModel = false
       requestZeta()
     }
   }
 
-  def assertWarmup(mDesc: ParameterDescriptor): Unit = {
-    assert(
-      getNodeId == 0 &&
-        getMLPipeline.getFittedData == getMiniBatchSize * miniBatches &&
-        isBlocked &&
-        mDesc.getMiscellaneous != null &&
-        mDesc.getMiscellaneous.last.isInstanceOf[Quantum]
-    )
+  def assertWarmup(): Unit = {
+    assert(getNodeId == 0 && getMLPipeline.getFittedData == getMiniBatchSize * miniBatches && isBlocked)
+    reset()
     unblockStream()
   }
 
@@ -256,6 +248,13 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   def getSafeZone: SafeZone = {
     val value = safeZone
     value
+  }
+
+  def getZeta: Double = {
+    safeZone.zeta(
+      getGlobalParams.asInstanceOf[Option[VectoredParameters]].get,
+      getMLPipelineParams.asInstanceOf[Option[VectoredParameters]].get
+    )
   }
 
   override def configureWorker(request: Request): MLWorker[FGMHubInterface, Querier] = {
