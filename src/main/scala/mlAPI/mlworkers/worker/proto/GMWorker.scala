@@ -75,9 +75,11 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
         blockStream()
       }
     } else {
-      if (!violatedAR && (processedData % (getMiniBatchSize * miniBatches) == 0) && violation) {
-        violatedAR = true
-        getProxy(0).violation()
+      if (!violatedAR) {
+        if ((processedData % (getMiniBatchSize * miniBatches) == 0) && violation) {
+          violatedAR = true
+          getProxy(0).violation()
+        }
       }
     }
   }
@@ -118,11 +120,11 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
 
   /** Sending the local model to the coordinator. */
   override def sendLocalModel(): Unit = {
-    println("Requested local model " + getNodeId)
+    println("---> Requested local model " + getNodeId)
     getMLPipelineParams match {
       case None => pendingModel = true
-      case Some(_) =>
-        for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getMLPipelineParams.get).zipWithIndex)
+      case Some(params) =>
+        for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = params).zipWithIndex)
           for (slice <- hubSubVec)
             getProxy(index).receiveLocalModel(slice).toSync(updateModel)
     }

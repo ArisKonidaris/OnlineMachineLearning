@@ -81,7 +81,7 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
   /** THis method is called by a worker when its admissible regin has been violated. */
   override def violation(): Unit = {
     if (!pendingNewRound) {
-      println("Violation " + getCurrentCaller)
+      println("---> Violation " + getCurrentCaller)
       pendingNewRound = true
       getBroadcastProxy.sendLocalModel()
     }
