@@ -135,6 +135,7 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       if (inc > parallelism) {
         psi = 0D
         activeSubRound = false
+        shippedZetas.clear()
         getBroadcastProxy.requestZeta()
       }
     }
