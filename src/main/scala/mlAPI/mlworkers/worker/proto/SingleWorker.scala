@@ -25,7 +25,8 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
   /** A method for training the single worker on a training data point. */
   def train(data: LearningPoint): Unit = {
     fit(data)
-    if (processedData >= getMiniBatchSize * miniBatches) push()
+    if (processedData >= getMiniBatchSize * miniBatches)
+      push()
   }
 
   /** The consumption of a data point by the Machine Learning worker.
@@ -34,6 +35,8 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
+    if (mlPipeline.getFittedData % 10000 == 0)
+      println(mlPipeline.getFittedData)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
