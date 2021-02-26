@@ -35,8 +35,6 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
    */
   @ProcessOp
   def receiveTuple(data: UsablePoint): Unit = {
-    if (mlPipeline.getFittedData % 10000 == 0)
-      println(mlPipeline.getFittedData)
     data match {
       case TrainingPoint(trainingPoint) => train(trainingPoint)
       case ForecastingPoint(forecastingPoint) =>
