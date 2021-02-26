@@ -140,14 +140,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
 
   /** Sending the local model to the coordinator. */
   override def sendLocalDrift(): Unit = {
-    try {
-      assert(!activeSubRound)
-    } catch {
-      case e: Exception =>
-        println(getNodeId + " failed at round " + round)
-        e.printStackTrace()
-        throw new RuntimeException
-    }
+    assert(!activeSubRound, getNodeId + " failed at round " + round)
     for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex)
       for (slice <- hubSubVec)
         getProxy(index).receiveLocalDrift(slice).toSync(newRound)
