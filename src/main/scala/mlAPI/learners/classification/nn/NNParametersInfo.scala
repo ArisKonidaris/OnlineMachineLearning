@@ -4,6 +4,9 @@ import org.deeplearning4j.nn.api.Model
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.api.shape.LongShapeDescriptor
 
+/**
+ * A helper class holding information about the parameters of a neural network.
+ */
 class NNParametersInfo(rank: Int,
                        rows: Int,
                        columns: Int,
