@@ -122,10 +122,10 @@ case class SynchronousWorker(override protected var maxMsgParams: Int = 10000)
         assertWarmup()
 
     } catch {
-      case e: Throwable =>
-        e.printStackTrace()
-        throw new RuntimeException("Something went wrong while updating the local model of worker " +
-          getNodeId + " of MLPipeline " + getNetworkID + ".")
+      case e: Throwable => throw e
+//        e.printStackTrace()
+//        throw new RuntimeException("Something went wrong while updating the local model of worker " +
+//          getNodeId + " of MLPipeline " + getNetworkID + ".")
     }
   }
 

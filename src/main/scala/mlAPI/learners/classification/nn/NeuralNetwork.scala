@@ -202,12 +202,12 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
       val (testX, testY) = concatPoints(testSet, ListBuffer[Double](), ListBuffer[Double]())
       val tX = Nd4j.create(testX, inputShape.updated(0, testSet.length), 'c')
       val tY = Nd4j.create(testY, Array(testSet.length, numOfClasses), 'c')
-      println(tX.shape().mkString("Array(", ", ", ")"))
-      println(tY.shape().mkString("Array(", ", ", ")"))
+//      println(tX.shape().mkString("Array(", ", ", ")"))
+//      println(tY.shape().mkString("Array(", ", ", ")"))
       val test = new ListDataSetIterator(new DataSet(tX, tY).asList())
       val eval: Evaluation = NN.evaluate(test)
-      println(tY.getRows(0,1,3,4))
-      println(NN.output(tX).getRows(0,1,3,4))
+//      println(tY.getRows(0,1,3,4))
+//      println(NN.output(tX).getRows(0,1,3,4))
       eval.f1()
     } else 0.0D
   }

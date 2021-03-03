@@ -26,7 +26,7 @@ case class CentralizedMLServer() extends NodeInstance[RemoteForwarder, Querier] 
 
   protected var model: MLPipeline = new MLPipeline()
 
-  protected var testSet: DataSet[TrainingPoint] = new DataSet[TrainingPoint](500)
+  protected var testSet: DataSet[TrainingPoint] = new DataSet[TrainingPoint](256)
 
   @InitOp
   def init(): Unit = ()
