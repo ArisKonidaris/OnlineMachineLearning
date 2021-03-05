@@ -32,6 +32,8 @@ import scala.collection.mutable
  * A Neural Network learner that utilizes the Deeplearning4j framework.
  *
  * @param conf The configuration of the Neural Network.
+ * @param inputShape The shape of the input of the neural network.
+ * @param numOfClasses The number of classes of the classification problem.
  */
 case class NeuralNetwork(var conf: MultiLayerConfiguration,
                          var inputShape: Array[Int],
