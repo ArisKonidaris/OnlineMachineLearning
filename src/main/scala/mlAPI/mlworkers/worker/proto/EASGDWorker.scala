@@ -186,10 +186,17 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
           predicates._1,
           score)
       )
-    else
-      getQuerier.sendQueryResponse(
-        new QueryResponse(queryId, queryTarget, pj._1.asJava, pj._2, protocol, pj._3, pj._4, pj._5, score)
-      )
+    else {
+      if (getNodeId == 0)
+        getQuerier.sendQueryResponse(
+          new QueryResponse(queryId, queryTarget, pj._1.asJava, pj._2, protocol, pj._3, pj._4, pj._5, score)
+        )
+      else {
+        getQuerier.sendQueryResponse(
+          new QueryResponse(queryId, queryTarget, null, null, null, processedData, pj._4, pj._5, score)
+        )
+      }
+    }
   }
 
   def setLearningRate(lr: Double): Unit = {
