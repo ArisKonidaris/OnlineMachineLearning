@@ -3,7 +3,7 @@ package mlAPI.mlworkers.worker
 import mlAPI.math.{DenseVector, SparseVector}
 import mlAPI.parameters.utils.{Bucket, ParameterDescriptor, WrappedVectoredParameters}
 import mlAPI.parameters.{LearningParameters, VectoredParameters, utils}
-import mlAPI.protocols.{LongWrapper, QuantilesWrapper}
+import mlAPI.protocols.{DoubleWrapper, LongWrapper, QuantilesWrapper}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer

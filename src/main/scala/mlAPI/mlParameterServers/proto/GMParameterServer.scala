@@ -71,6 +71,10 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
     val model = warmUpModel()
     protocolStatistics.updateModelsShipped(parallelism - 1)
     protocolStatistics.updateBytesShipped((parallelism - 1) * (for (slice <- model) yield slice.getSize).sum)
+    if (getNodeId == 0) {
+      assert(roundLoss.getCount == 1)
+      updateLearningCurve()
+    }
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).updateModel(slice)
@@ -95,7 +99,6 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
   override def receiveLocalModel(mDesc: ParameterDescriptor): Response[ParameterDescriptor] = {
     protocolStatistics.updateBytesShipped(mDesc.getSize)
     if (updateParameterTree(mDesc)) {
-//      println("---> Got model " + getCurrentCaller)
       protocolStatistics.updateModelsShipped()
       protocolStatistics.updateNumOfBlocks()
       counter += 1
@@ -103,6 +106,10 @@ case class GMParameterServer() extends VectoredPS[GMRemoteLearner, Querier] with
       reconstructedVectorSlice = null
       if (counter == parallelism) {
         globalVectorSlice = (1.0 / (1.0 * counter)) * vector
+        if (getNodeId == 0) {
+          assert(roundLoss.getCount == counter)
+          updateLearningCurve()
+        }
         makeBroadcastPromise[ParameterDescriptor]()
         startRound()
       } else

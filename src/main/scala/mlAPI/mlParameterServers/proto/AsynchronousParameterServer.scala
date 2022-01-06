@@ -97,8 +97,15 @@ case class AsynchronousParameterServer() extends VectoredPS[RemoteLearner, Queri
     if (updated)
       try {
         globalVectorSlice += (reconstructedVectorSlice * (1.0 / (1.0 * getNumberOfSpokes)))
+        if (getNodeId == 0 && roundLoss.getCount == parallelism)
+          updateLearningCurve()
       } catch {
-        case _: Throwable => globalVectorSlice = reconstructedVectorSlice.copy
+        case _: Throwable =>
+          globalVectorSlice = reconstructedVectorSlice.copy
+          if (getNodeId == 0) {
+            assert(roundLoss.getCount == 1)
+            updateLearningCurve()
+          }
       } finally {
         reconstructedVectorSlice = null
       }

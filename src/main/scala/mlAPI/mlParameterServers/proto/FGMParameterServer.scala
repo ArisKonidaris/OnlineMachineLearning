@@ -93,6 +93,10 @@ case class FGMParameterServer(private var precision: Double = 0.01,
     val model = warmUpModel()
     protocolStatistics.updateModelsShipped(parallelism - 1)
     protocolStatistics.updateBytesShipped((parallelism - 1) * (for (slice <- model) yield slice.getSize).sum)
+    if (getNodeId == 0) {
+      assert(roundLoss.getCount == 1)
+      updateLearningCurve()
+    }
     for (worker: Int <- 1 until parallelism)
       for (slice <- model)
         getProxy(worker).newRound(slice)
@@ -186,6 +190,10 @@ case class FGMParameterServer(private var precision: Double = 0.01,
       drift += reconstructedVectorSlice
       if (shippedDrifts.size == parallelism) {
         globalVectorSlice += (1.0 / (1.0 * shippedDrifts.toArray.map(x => x._2).sum)) * drift
+        if (getNodeId == 0) {
+          assert(roundLoss.getCount == parallelism)
+          updateLearningCurve()
+        }
         makeBroadcastPromise[ParameterDescriptor]()
         startRound()
       } else

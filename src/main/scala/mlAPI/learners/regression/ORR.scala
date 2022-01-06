@@ -71,6 +71,12 @@ case class ORR() extends Regressor with Serializable {
 
   override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
+  override def loss(data: LearningPoint): Double =
+    Math.pow(data.asInstanceOf[LabeledPoint].label - predict(data).get, 2) + lambda * Math.pow(weights.frobeniusNorm, 2)
+
+  override def loss(batch: ListBuffer[LearningPoint]): Double =
+    (for (point <- batch) yield loss(point)).sum / (1.0 * batch.length)
+
   override def score(testSet: ListBuffer[LearningPoint]): Double =
     Scores.RMSE(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 

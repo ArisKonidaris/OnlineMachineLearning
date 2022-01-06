@@ -4,7 +4,8 @@ import BipartiteTopologyAPI.futures.Response
 import breeze.linalg.{DenseVector => BreezeDenseVector}
 import mlAPI.math.{DenseVector, SparseVector}
 import mlAPI.parameters.utils.{Bucket, ParameterDescriptor}
-import mlAPI.protocols.{IntWrapper, LongWrapper, QuantilesWrapper}
+import mlAPI.preprocessing.RunningMean
+import mlAPI.protocols.{DoubleWrapper, IntWrapper, LongWrapper, QuantilesWrapper}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -56,6 +57,12 @@ abstract class VectoredPS[WorkerIfc, QueryIfc] extends MLParameterServer[WorkerI
       parameterTree.put(getCurrentCaller, new mutable.TreeMap[(Int, Int), ParameterDescriptor]())
     if (pDesc.getFitted != null)
       incrementNumberOfFittedData(pDesc.getFitted.getLong)
+    if (pDesc.getMiscellaneous != null)
+      if (pDesc.getMiscellaneous.length == 1 && pDesc.getMiscellaneous.head.isInstanceOf[DoubleWrapper])
+        getRoundLoss.update(pDesc.getMiscellaneous.head.asInstanceOf[DoubleWrapper].getDouble)
+      else
+        if (pDesc.getMiscellaneous.last.isInstanceOf[DoubleWrapper])
+          getRoundLoss.update(pDesc.getMiscellaneous.last.asInstanceOf[DoubleWrapper].getDouble)
     parameterTree(getCurrentCaller).put((pDesc.getBucket.getStart.toInt, pDesc.getBucket.getEnd.toInt), pDesc)
     if (jurisdiction._1 == parameterTree(getCurrentCaller).size) {
       reconstructedVectorSlice =
@@ -169,6 +176,11 @@ abstract class VectoredPS[WorkerIfc, QueryIfc] extends MLParameterServer[WorkerI
   def isWarmedUp: Boolean = {
     val value = warmed
     value
+  }
+
+  def updateLearningCurve(): Unit = {
+    learningCurve.append((roundLoss.getMean, fitted))
+    roundLoss = RunningMean()
   }
 
 }

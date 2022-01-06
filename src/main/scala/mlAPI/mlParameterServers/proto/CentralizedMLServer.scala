@@ -8,6 +8,7 @@ import mlAPI.math.{ForecastingPoint, LabeledPoint, LearningPoint, TrainingPoint,
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.utils.ParameterDescriptor
 import mlAPI.pipelines.MLPipeline
+import mlAPI.preprocessing.RunningMean
 import mlAPI.protocols.statistics.SingleLearnerStatistics
 import mlAPI.protocols.{CentralizedLearner, IntWrapper, LongWrapper, RemoteForwarder}
 
@@ -28,6 +29,18 @@ case class CentralizedMLServer() extends NodeInstance[RemoteForwarder, Querier] 
 
   protected var testSet: DataSet[TrainingPoint] = new DataSet[TrainingPoint](256)
 
+  protected var cumulativeLoss: Double = 0.0
+
+  protected var miniBatches: Int = 256
+
+  protected var cnt: Int = 0
+
+  /** An index counter. */
+  protected var idx: Int = 0
+
+  /** The learning curve for the ML pipeline. */
+  protected var learningCurve: DataSet[(Double, Long)] = new DataSet[(Double, Long)](100000)
+
   @InitOp
   def init(): Unit = ()
 
@@ -45,14 +58,23 @@ case class CentralizedMLServer() extends NodeInstance[RemoteForwarder, Querier] 
       case tP: TrainingPoint =>
         if (count >= 8) {
           testSet.append(tP) match {
-            case Some(point: TrainingPoint) => model.fitLoss(point.trainingPoint)
+            case Some(point: TrainingPoint) =>
+              model.fitLoss(point.trainingPoint)
+              cnt += 1
             case None =>
           }
-        } else
+        } else {
           model.fitLoss(tP.trainingPoint)
+          cnt += 1
+        }
         count += 1
         if (count == 10)
           count = 0
+        if (cnt == miniBatches) {
+          learningCurve.append(((model.getCumulativeLoss - cumulativeLoss) / miniBatches, model.getFittedData))
+          cumulativeLoss = model.getCumulativeLoss
+          cnt = 0
+        }
       case fP: ForecastingPoint =>
         val prediction: Double = {
           try {
@@ -111,5 +133,13 @@ case class CentralizedMLServer() extends NodeInstance[RemoteForwarder, Querier] 
   def fitted: Long = model.getFittedData
 
   def getProtocolStatistics: SingleLearnerStatistics = statistics
+
+  def getLearningCurve: DataSet[(Double,Long)] = learningCurve
+
+  def getIdx: Int = idx
+
+  def setLearningCurve(learningCurve: DataSet[(Double,Long)]): Unit = this.learningCurve = learningCurve
+
+  def setIdx(idx: Int): Unit = this.idx = idx
 
 }

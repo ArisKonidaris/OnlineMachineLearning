@@ -60,7 +60,7 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        for ((hubSubVector, index: Int) <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get).zipWithIndex)
+        for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)).zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
@@ -70,8 +70,11 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
         if (clock - min > s)
           pushPull()
         else
-          for ((hubSubVector, index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex) {
-            hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)))
+          for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(model = getDeltaVector)).zipWithIndex) {
+            if (hubSubVector.last.getMiscellaneous == null)
+              hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)))
+            else
+              hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)) ++ hubSubVector.last.getMiscellaneous)
             for (slice <- hubSubVector)
               getProxy(index).push(slice)
           }
@@ -105,8 +108,11 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
 
   /** Pushing the local model to the parameter server(s) and waiting for the new global model. */
   def pushPull(): Unit = {
-    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex) {
-      hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)))
+    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sendLoss(ModelMarshalling(model = getDeltaVector)).zipWithIndex) {
+      if (hubSubVector.last.getMiscellaneous == null)
+        hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)))
+      else
+        hubSubVector.last.setMiscellaneous(Array(LongWrapper(clock)) ++ hubSubVector.last.getMiscellaneous)
       for (slice <- hubSubVector)
         getProxy(index).pushPull(slice).toSync(updateModel)
     }
@@ -188,7 +194,8 @@ case class SSPWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

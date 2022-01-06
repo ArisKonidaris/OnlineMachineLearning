@@ -121,13 +121,22 @@ case class SynchronousParameterServer() extends VectoredPS[RemoteLearner, Querie
         if (counter == parallelism) {
           globalVectorSlice *= (1.0 / (1.0 * parallelism))
           counter = 0
+          if (getNodeId == 0) {
+            assert(roundLoss.getCount == parallelism)
+            updateLearningCurve()
+          }
           return true
         }
       } else {
         globalVectorSlice = reconstructedVectorSlice.copy
         reconstructedVectorSlice = null
+        if (getNodeId == 0) {
+          assert(roundLoss.getCount == 1)
+          updateLearningCurve()
+        }
         return true
       }
     false
   }
+
 }

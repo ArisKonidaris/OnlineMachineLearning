@@ -42,17 +42,17 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     }
   }
 
+  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
+    fitLoss(batch)
+    ()
+  }
+
   override def fitLoss(data: LearningPoint): Double = {
     data match {
       case labeledPoint: LabeledPoint => 1.0 * tree.ht.fit(labeledPoint)
       case _ =>
         throw new RuntimeException("LABEL MISSING ERROR: Cannot train the Hoeffding Tree on an unlabeled data point.")
     }
-  }
-
-  override def fit(batch: ListBuffer[LearningPoint]): Unit = {
-    fitLoss(batch)
-    ()
   }
 
   override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
@@ -181,6 +181,11 @@ case class HoeffdingTreeClassifier() extends Classifier with Serializable {
     )
   }
 
+  //TODO: Implement the loss of the Hoeffding Tree.
+  override def loss(data: LearningPoint): Double = 0.0
+
+  //TODO: Implement the loss of the Hoeffding Tree.
+  override def loss(batch: ListBuffer[LearningPoint]): Double = 0.0
 }
 
 object HoeffdingTreeClassifier {

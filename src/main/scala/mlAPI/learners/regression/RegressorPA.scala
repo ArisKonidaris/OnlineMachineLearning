@@ -44,6 +44,18 @@ case class RegressorPA() extends PassiveAggressiveLearners with Regressor with S
     }
   }
 
+  override def loss(data: LearningPoint): Double = {
+    predictWithMargin(data) match {
+      case Some(prediction) => Math.abs(data.asInstanceOf[LabeledPoint].label - prediction) - epsilon
+      case None =>
+        checkParameters(data)
+        loss(data)
+    }
+  }
+
+  override def loss(batch: ListBuffer[LearningPoint]): Double =
+    (for (point <- batch) yield loss(point)).sum / (1.0 * batch.length)
+
   override def score(testSet: ListBuffer[LearningPoint]): Double =
     Scores.RMSE(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 

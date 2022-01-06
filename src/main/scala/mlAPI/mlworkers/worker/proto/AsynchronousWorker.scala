@@ -49,7 +49,7 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        for ((hubSubVector, index: Int) <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get).zipWithIndex)
+        for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)).zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
@@ -84,7 +84,7 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
 
   /** Pushing the local model to the parameter server(s) and waiting for the new global model. */
   def pushPull(): Unit = {
-    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex)
+    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sendLoss(ModelMarshalling(model = getDeltaVector)).zipWithIndex)
       for (slice <- hubSubVector)
         getProxy(index).pushPull(slice).toSync(updateModel)
     processedData = 0
@@ -163,7 +163,8 @@ case class AsynchronousWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

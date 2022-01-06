@@ -45,8 +45,10 @@ case class SimplePS() extends VectoredPS[RemoteLearner, Querier] with Push {
 
   def updateGlobalState(mDesc: ParameterDescriptor): Boolean = {
     val updated: Boolean = updateParameterTree(mDesc)
-    if (updated)
+    if (updated) {
       globalVectorSlice = reconstructedVectorSlice.copy
+      if (getNodeId == 0) updateLearningCurve()
+    }
     updated
   }
 

@@ -8,7 +8,7 @@ import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.mlworkers.worker.{MLWorker, VectoredWorker}
 import mlAPI.parameters.VectoredParameters
 import mlAPI.parameters.utils.{ParameterDescriptor, WrappedVectoredParameters}
-import mlAPI.protocols.IntWrapper
+import mlAPI.protocols.{DoubleWrapper, IntWrapper}
 import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 import mlAPI.utils.Parsing
 
@@ -62,7 +62,7 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        for ((hubSubVector, index: Int) <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get).zipWithIndex)
+        for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)).zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
@@ -153,7 +153,7 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
     val dif = getMLPipelineParams.get.asInstanceOf[VectoredParameters] - getGlobalParams.get.asInstanceOf[VectoredParameters]
     getMLPipelineParams.get.asInstanceOf[VectoredParameters] -=
       (dif.asInstanceOf[VectoredParameters] * alpha).asInstanceOf[VectoredParameters]
-    for ((hubSubVector, index: Int) <- ModelMarshalling(model = dif).zipWithIndex)
+    for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(model = dif)).zipWithIndex)
       for (slice <- hubSubVector)
         getProxy(index).push(slice)
     processedData = 0
@@ -184,7 +184,8 @@ case class EASGDWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

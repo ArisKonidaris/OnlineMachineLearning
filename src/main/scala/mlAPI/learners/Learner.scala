@@ -79,6 +79,10 @@ trait Learner extends Serializable with WithParams {
 
   def fitLoss(batch: ListBuffer[LearningPoint]): Double
 
+  def loss(data: LearningPoint): Double
+
+  def loss(batch: ListBuffer[LearningPoint]): Double
+
   def score(testSet: ListBuffer[LearningPoint]): Double
 
   def generateParameters: ParameterDescriptor => LearningParameters

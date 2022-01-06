@@ -2,12 +2,13 @@ package mlAPI.mlworkers.worker.proto
 
 import BipartiteTopologyAPI.annotations.{InitOp, ProcessOp, QueryOp}
 import ControlAPI.{Prediction, QueryResponse}
-import mlAPI.math.{ForecastingPoint, LabeledPoint, UsablePoint, LearningPoint, TrainingPoint, UnlabeledPoint}
+import mlAPI.math.{ForecastingPoint, LabeledPoint, LearningPoint, TrainingPoint, UnlabeledPoint, UsablePoint}
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.mlworkers.worker.VectoredWorker
 import mlAPI.parameters.VectoredParameters
 import mlAPI.parameters.utils.{ParameterDescriptor, WrappedVectoredParameters}
-import mlAPI.protocols.IntWrapper
+import mlAPI.pipelines.MLPipeline.pipePoints
+import mlAPI.protocols.{DoubleWrapper, IntWrapper, LongWrapper}
 import mlAPI.protocols.periodic.{PushPull, RemoteLearner}
 
 import scala.collection.mutable.ListBuffer
@@ -41,7 +42,7 @@ case class SynchronousWorker(override protected var maxMsgParams: Int = 10000)
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        for ((hubSubVector, index: Int) <- ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get).zipWithIndex)
+        for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)).zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).push(slice)
         processedData = 0
@@ -76,7 +77,7 @@ case class SynchronousWorker(override protected var maxMsgParams: Int = 10000)
 
   /** Pushing the local model to the parameter server(s) and waiting for the new global model. */
   def pushPull(): Unit = {
-    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getMLPipelineParams.get).zipWithIndex)
+    for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sendLoss(ModelMarshalling(model = getMLPipelineParams.get)).zipWithIndex)
       for (slice <- hubSubVector)
         getProxy(index).pushPull(slice).toSync(updateModel)
     processedData = 0
@@ -123,9 +124,6 @@ case class SynchronousWorker(override protected var maxMsgParams: Int = 10000)
 
     } catch {
       case e: Throwable => throw e
-//        e.printStackTrace()
-//        throw new RuntimeException("Something went wrong while updating the local model of worker " +
-//          getNodeId + " of MLPipeline " + getNetworkID + ".")
     }
   }
 
@@ -162,7 +160,8 @@ case class SynchronousWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

@@ -83,6 +83,20 @@ case class KMeans() extends Clusterer with Serializable {
 
   override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
+  override def loss(data: LearningPoint): Double = {
+    val dist: Array[Double] = distribution(data)
+    if (!dist.isEmpty) {
+      val prediction: Int = dist.zipWithIndex.min._2
+      Math.pow(dist(prediction), 2)
+    } else {
+      initializeModel(data)
+      loss(data)
+    }
+  }
+
+  override def loss(batch: ListBuffer[LearningPoint]): Double =
+    (for (point <- batch) yield loss(point)).sum / (1.0 * batch.length)
+
   override def score(testSet: ListBuffer[LearningPoint]): Double = Scores.inertia(testSet, this)
 
   override def distribution(data: LearningPoint): Array[Double] = {

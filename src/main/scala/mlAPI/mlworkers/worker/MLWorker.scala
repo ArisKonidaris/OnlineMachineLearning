@@ -3,10 +3,13 @@ package mlAPI.mlworkers.worker
 import ControlAPI.Request
 import BipartiteTopologyAPI.NodeInstance
 import BipartiteTopologyAPI.annotations.MergeOp
+import mlAPI.dataBuffers.DataSet
 import mlAPI.math.LearningPoint
 import mlAPI.pipelines.MLPipeline
 import mlAPI.parameters.LearningParameters
 import mlAPI.parameters.utils.ParameterDescriptor
+import mlAPI.pipelines.MLPipeline.{pipePoint, pipePoints}
+import mlAPI.protocols.DoubleWrapper
 import mlAPI.utils.Parsing
 
 import scala.collection.mutable
@@ -47,6 +50,8 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   /** The maximum number of parameters that can be transmitted over the network. */
   protected var maxMsgParams: Int
 
+  protected var cumulativeLoss: Double = 0.0
+
   // =============================================== Getters ===========================================================
 
   def getProtocol: String = protocol
@@ -70,6 +75,8 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def getMaxMsgParams: Int = maxMsgParams
 
   def isWarmedUp: Boolean = warmed
+
+  def getCumulativeLoss: Double = cumulativeLoss
 
   // =============================================== Setters ===========================================================
 
@@ -98,6 +105,8 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
   def setMaxMsgParams(maxMsgParams: Int): Unit = this.maxMsgParams = maxMsgParams
 
   def setWarmed(warmed: Boolean): Unit = this.warmed = warmed
+
+  def setCumulativeLoss(cumulativeLoss: Double): Unit = this.cumulativeLoss = cumulativeLoss
 
   // ======================================== ML worker basic operations ===============================================
 
@@ -163,10 +172,7 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
 
   /** The method called on a data point to train the ML Pipeline. */
   def fit(data: LearningPoint): Unit = {
-    if ((processedData + 1) % getMiniBatchSize == 0)
-      mlPipeline.fitLoss(data)
-    else
-      mlPipeline.fit(data)
+    mlPipeline.fitLoss(data)
     processedData += 1
   }
 
@@ -224,6 +230,17 @@ abstract class MLWorker[ProxyIfc, QueryIfc]() extends NodeInstance[ProxyIfc, Que
     if (mDesc.getFitted != null)
       mlPipeline.setFittedData(mDesc.getFitted.getLong)
     unblockStream()
+  }
+
+  def sendLoss(serMdl: Array[Array[ParameterDescriptor]]): Array[Array[ParameterDescriptor]] = {
+    val roundLoss: Double = (getMLPipeline.getCumulativeLoss - getCumulativeLoss) / ((1.0 * processedData) / (1.0 * getMiniBatchSize))
+    setCumulativeLoss(getMLPipeline.getCumulativeLoss)
+    val m = serMdl.head.last
+    if (m.getMiscellaneous != null)
+      m.setMiscellaneous(m.getMiscellaneous ++ Array(DoubleWrapper(roundLoss)))
+    else
+      m.setMiscellaneous(Array(DoubleWrapper(roundLoss)))
+    serMdl
   }
 
 }

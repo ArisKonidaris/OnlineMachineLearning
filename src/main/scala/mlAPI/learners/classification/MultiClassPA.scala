@@ -101,6 +101,27 @@ case class MultiClassPA() extends Classifier with Serializable {
 
   override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
+  override def loss(data: LearningPoint): Double = {
+    predict(data) match {
+      case Some(prediction) =>
+        val label: Double = data.asInstanceOf[LabeledPoint].label
+        val pred: Int = prediction.toInt
+        val exp_weights = weights.vectorBiases(label.toInt)
+        val pred_weights = weights.vectorBiases(pred)
+        1.0 - (
+          ((data.getNumericVector.asBreeze dot exp_weights.weights) + exp_weights.intercept)
+            -
+            ((data.getNumericVector.asBreeze dot pred_weights.weights) + pred_weights.intercept)
+          )
+      case None =>
+        checkParameters(data)
+        loss(data)
+    }
+  }
+
+  override def loss(batch: ListBuffer[LearningPoint]): Double =
+    (for (point <- batch) yield loss(point)).sum / (1.0 * batch.length)
+
   override def score(testSet: ListBuffer[LearningPoint]): Double =
     Scores.F1Score(testSet.asInstanceOf[ListBuffer[LabeledPoint]], this)
 

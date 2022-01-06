@@ -199,6 +199,34 @@ case class NeuralNetwork(var conf: MultiLayerConfiguration,
 
   override def fitLoss(batch: ListBuffer[LearningPoint]): Double = (for (point <- batch) yield fitLoss(point)).sum
 
+  override def loss(data: LearningPoint): Double = {
+    val dataPoint = data.asInstanceOf[LabeledPoint]
+    val testX: Array[Double] = dataPoint.getNumericVector.toArray
+    val testY = (for (i <- 0 to 9) yield { if (i * 1.0 == dataPoint.getLabel - 1.0) 1.0 else 0.0 }).toArray
+    val test = new DataSet(
+      Nd4j.create(testX, inputShape.updated(0, 1)),
+      Nd4j.create(testY, Array(1, numOfClasses))
+    )
+    NN.score(test)
+  }
+
+  override def loss(batch: ListBuffer[LearningPoint]): Double = {
+    if (batch.nonEmpty) {
+      val (testX, testY) = concatPoints(batch, ListBuffer[Double](), ListBuffer[Double]())
+      val tX = Nd4j.create(testX, inputShape.updated(0, batch.length), 'c')
+      val tY = Nd4j.create(testY, Array(batch.length, numOfClasses), 'c')
+      val test: ListDataSetIterator[DataSet] = new ListDataSetIterator(new DataSet(tX, tY).asList())
+      var loss: Double = 0.0
+      var cnt: Double = 0.0
+      while(test.hasNext) {
+        val next = test.next()
+        loss += NN.score(next) * next.numExamples()
+        cnt += next.numExamples()
+      }
+      loss / cnt
+    } else 0.0D
+  }
+
   override def score(testSet: ListBuffer[LearningPoint]): Double = {
     if (testSet.nonEmpty) {
       val (testX, testY) = concatPoints(testSet, ListBuffer[Double](), ListBuffer[Double]())

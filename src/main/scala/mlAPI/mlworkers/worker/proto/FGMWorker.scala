@@ -82,7 +82,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        val sWarmupModel = ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)
+        val sWarmupModel = sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get))
         for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sWarmupModel.zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).endWarmup(slice)
@@ -141,7 +141,7 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
   /** Sending the local model to the coordinator. */
   override def sendLocalDrift(): Unit = {
     assert(!activeSubRound, getNodeId + " failed at round " + round)
-    for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = getDeltaVector).zipWithIndex)
+    for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- sendLoss(ModelMarshalling(model = getDeltaVector)).zipWithIndex)
       for (slice <- hubSubVec)
         getProxy(index).receiveLocalDrift(slice).toSync(newRound)
     processedData = 0
@@ -307,7 +307,8 @@ case class FGMWorker(private var safeZone: SafeZone = VarianceSafeZone(),
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

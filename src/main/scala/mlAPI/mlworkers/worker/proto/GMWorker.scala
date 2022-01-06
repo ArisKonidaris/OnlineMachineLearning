@@ -67,7 +67,7 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
         }
         setWarmed(true)
         setGlobalModelParams(warmupModel)
-        val sWarmupModel = ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get)
+        val sWarmupModel = sendLoss(ModelMarshalling(sendSizes = true, model = getMLPipelineParams.get))
         for ((hubSubVector: Array[ParameterDescriptor], index: Int) <- sWarmupModel.zipWithIndex)
           for (slice <- hubSubVector)
             getProxy(index).endWarmup(slice)
@@ -124,7 +124,7 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
     getMLPipelineParams match {
       case None => pendingModel = true
       case Some(params) =>
-        for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- ModelMarshalling(model = params).zipWithIndex)
+        for ((hubSubVec: Array[ParameterDescriptor], index: Int) <- sendLoss(ModelMarshalling(model = params)).zipWithIndex)
           for (slice <- hubSubVec)
             getProxy(index).receiveLocalModel(slice).toSync(updateModel)
     }
@@ -243,7 +243,8 @@ case class GMWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else {
       if (getNodeId == 0)

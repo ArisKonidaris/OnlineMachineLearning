@@ -2,6 +2,7 @@ package mlAPI.pipelines
 
 import ControlAPI.{Request, LearnerPOJO => POJOLearner, PreprocessorPOJO => POJOPreprocessor}
 import ControlAPI.{TransformerPOJO => POJOTransformer}
+import mlAPI.dataBuffers.DataSet
 import mlAPI.math.LearningPoint
 import mlAPI.learners.Learner
 import mlAPI.learners.classification.nn.NeuralNetwork

@@ -5,6 +5,7 @@ import ControlAPI.Request
 import mlAPI.mlParameterServers.VectoredPS
 import mlAPI.mlworkers.interfaces.Querier
 import mlAPI.parameters.utils.ParameterDescriptor
+import mlAPI.preprocessing.RunningMean
 import mlAPI.protocols.periodic.{PullPush, RemoteLearner}
 import mlAPI.protocols.statistics.EASGDStatistics
 import mlAPI.utils.Parsing
@@ -85,8 +86,15 @@ case class EASGDParameterServer() extends VectoredPS[RemoteLearner, Querier] wit
     if (updated)
       try {
         globalVectorSlice += alpha * reconstructedVectorSlice
+        if (getNodeId == 0 && roundLoss.getCount == parallelism)
+          updateLearningCurve()
       } catch {
-        case _: Throwable => globalVectorSlice = reconstructedVectorSlice.copy
+        case _: Throwable =>
+          globalVectorSlice = reconstructedVectorSlice.copy
+          if (getNodeId == 0) {
+            assert(roundLoss.getCount == 1)
+            updateLearningCurve()
+          }
       } finally {
         reconstructedVectorSlice = null
       }

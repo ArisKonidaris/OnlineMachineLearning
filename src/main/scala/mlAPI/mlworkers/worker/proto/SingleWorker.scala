@@ -54,7 +54,7 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
 
   /** Pushing the local model to the parameter server(s). */
   def push(): Unit = {
-    for ((hubSubVector, index: Int) <- ModelMarshalling(model = getMLPipelineParams.get, sendSizes = true).zipWithIndex)
+    for ((hubSubVector, index: Int) <- sendLoss(ModelMarshalling(model = getMLPipelineParams.get, sendSizes = true)).zipWithIndex)
       for (slice <- hubSubVector)
         getProxy(index).push(slice)
     processedData = 0
@@ -84,7 +84,8 @@ case class SingleWorker(override protected var maxMsgParams: Int = 10000)
           processedData,
           null,
           predicates._1,
-          score)
+          score
+        )
       )
     else
       getQuerier.sendQueryResponse(
